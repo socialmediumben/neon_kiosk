@@ -19,53 +19,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-/**
- * BULK SEARCH ROUTE
- * This uses the 'First Name NOT_BLANK' strategy to pull every individual 
- * account while explicitly requesting the Phone1 field for your lookup table.
- */
-app.get('/discovery/bulk-accounts', async (req, res) => {
-    const page = req.query.page || 0;
-    try {
-        const response = await fetch(`https://api.neoncrm.com/v2/accounts/search?userType=INDIVIDUAL`, {
-            method: 'POST',
-            headers: { 
-                'Authorization': `Basic ${getNeonAuth()}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                searchFields: [{
-                    field: "First Name",
-                    operator: "NOT_BLANK",
-                    value: "" 
-                }],
-                outputFields: ["First Name", "Last Name", "Account ID", "Phone1", "Email"],
-                pagination: {
-                    currentPage: parseInt(page),
-                    pageSize: 200,
-                    sortColumn: "First Name",
-                    sortDirection: "ASC"
-                }
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            console.error("Neon API Error Details:", data);
-        }
-        
-        res.json(data);
-    } catch (err) {
-        console.error("Server Error:", err.message);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-/**
- * GENERAL PROXY ROUTE
- * Handles real-time requests for individual account profiles and activity creation.
- */
+// Proxy all Neon API calls
 app.all('/api/*', async (req, res) => {
     try {
         const neonPath = req.path.replace('/api', '');
