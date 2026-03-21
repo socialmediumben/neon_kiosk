@@ -45,7 +45,6 @@
     <script>
         const API_PROXY_URL = window.location.origin;
         const WAIVER_FIELD_ID = "87";
-        // UPDATED: Based on your successful manual entry
         const SYSTEM_USER_ID = "3508"; 
         let currentAccount = null;
 
@@ -88,7 +87,7 @@
             } else {
                 actions.innerHTML = `
                     <div class="bg-red-50 text-red-700 p-4 rounded-xl mb-6 font-medium text-lg">⚠ Waiver Required</div>
-                    <p class="text-gray-600 mb-6 px-4">Missing signed waiver. Please see a staff member.</p>
+                    <p class="text-gray-600 mb-6 px-4">Our records show you are missing a signed waiver. Please see a staff member to sign one.</p>
                 `;
             }
             showStage('stage-confirm');
@@ -98,33 +97,30 @@
             setLoading(true, "Checking you in...");
             const now = new Date();
             
-            // Format Date: YYYY-MM-DD
-            const dateStr = now.toISOString().split('T')[0];
+            // TIMEZONE FIX: Force 'America/Los_Angeles' (Pacific Time)
+            const dateOptions = { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' };
+            const parts = new Intl.DateTimeFormat('en-US', dateOptions).formatToParts(now);
+            const dateStr = `${parts.find(p => p.type === 'year').value}-${parts.find(p => p.type === 'month').value}-${parts.find(p => p.type === 'day').value}`;
             
-            // Format Time: h:mm A (e.g., "5:41 AM") to match your manual success entry
             const timeStr = now.toLocaleTimeString('en-US', { 
+                timeZone: 'America/Los_Angeles',
                 hour: 'numeric', 
                 minute: '2-digit', 
                 hour12: true 
             });
 
-            // UPDATED: Matches your successful manual activity exactly
             const payload = {
                 "subject": "Check-In",
                 "activityDates": {
                     "startDate": dateStr,
                     "startTime": timeStr,
-                    "timeZone": { "id": "1" }
+                    "timeZone": { "id": "1" } 
                 },
-                "clientAccount": [
-                    { "accountId": String(currentAccount.accountId) }
-                ],
+                "clientAccount": [{ "accountId": String(currentAccount.accountId) }],
                 "systemUserId": [ String(SYSTEM_USER_ID) ],
-                "status": { "id": "4" }, // Correct ID for 'Completed' status
+                "status": { "id": "4" },
                 "priority": "Low"
             };
-
-            console.log("[DEBUG] Sending Payload:", JSON.stringify(payload));
 
             try {
                 const response = await fetch(`${API_PROXY_URL}/api/v2/activities`, {
@@ -132,15 +128,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                
                 const result = await response.json();
-                console.log("[DEBUG] Result:", result);
-
-                if (!response.ok) {
-                    const errorMsg = result.errors ? result.errors.map(e => e.message).join(", ") : "Check-in failed";
-                    throw new Error(errorMsg);
-                }
-
+                if (!response.ok) throw new Error("Check-in failed");
                 document.getElementById('success-msg').textContent = `${currentAccount.primaryContact.firstName} is checked in!`;
                 showStage('stage-success');
             } catch (e) {
