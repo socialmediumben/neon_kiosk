@@ -2,55 +2,40 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Neon CRM Search - Schema Match</title>
+    <title>Neon ID Inspector</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 flex items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-lg bg-white p-8 rounded-2xl shadow-xl">
-        <h1 class="text-2xl font-bold text-center mb-6">Neon CRM Search</h1>
+    <div class="w-full max-w-2xl bg-white p-8 rounded-2xl shadow-xl">
+        <h1 class="text-2xl font-bold text-center mb-6">Data Inspector</h1>
         
-        <input type="text" id="search-value" class="w-full p-4 border rounded-lg mb-4 text-center text-xl" placeholder="Last Name or Phone">
-        
-        <div class="grid grid-cols-2 gap-4">
-            <button onclick="runSearch('Last Name')" class="py-3 bg-blue-600 text-white rounded-xl font-bold">By Last Name</button>
-            <button onclick="runSearch('Phone1')" class="py-3 bg-indigo-600 text-white rounded-xl font-bold">By Phone1</button>
+        <div class="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
+            <p class="text-sm text-blue-700 font-bold mb-2">Step 1: Inspect Benyomin's Data</p>
+            <button onclick="inspectAccount('1147')" class="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">
+                Pull Full Data for Account 1147
+            </button>
         </div>
 
-        <div class="mt-8 p-4 bg-black rounded-lg">
-            <p class="text-green-400 font-mono text-xs uppercase mb-2">Neon Response:</p>
-            <pre id="console" class="text-white font-mono text-sm overflow-auto max-h-96">Waiting for search...</pre>
+        <div class="mt-4 p-4 bg-black rounded-lg">
+            <p class="text-green-400 font-mono text-xs uppercase mb-2">Technical Output:</p>
+            <pre id="console" class="text-white font-mono text-sm overflow-auto max-h-[500px]">Waiting for inspection...</pre>
         </div>
     </div>
 
     <script>
-        async function runSearch(fieldType) {
-            const val = document.getElementById('search-value').value;
+        const API_PROXY_URL = window.location.origin;
+
+        async function inspectAccount(accountId) {
             const output = document.getElementById('console');
-            output.textContent = `Searching ${fieldType}...`;
+            output.textContent = `Fetching full record for ID ${accountId}...`;
             
             try {
-                // Exact match to the searchRequest schema you provided
-                const res = await fetch(`${window.location.origin}/api/v2/accounts/search?userType=INDIVIDUAL`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        searchFields: [{
-                            field: fieldType,
-                            operator: fieldType === 'Phone1' ? "CONTAIN" : "EQUAL",
-                            value: val
-                        }],
-                        outputFields: ["First Name", "Last Name", "Account ID"],
-                        pagination: {
-                            currentPage: 0,
-                            pageSize: 10,
-                            sortColumn: "Last Name",
-                            sortDirection: "ASC"
-                        }
-                    })
-                });
-                
+                // Using the direct GET /accounts/{id} endpoint to see EVERYTHING
+                const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/${accountId}`);
                 const data = await res.json();
+                
+                // We want to see the exact structure of "individualAccount"
                 output.textContent = JSON.stringify(data, null, 2);
             } catch (e) {
                 output.textContent = "Error: " + e.message;
