@@ -53,16 +53,20 @@
             if (!id) return alert("Please enter an Account ID.");
 
             setLoading(true, "Finding account...");
+            console.log(`[DEBUG] Looking up account ID: ${id}`);
             try {
                 const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/${id}`);
                 const data = await res.json();
 
-                if (!res.ok || !data.individualAccount) throw new Error("Account not found.");
+                if (!res.ok) {
+                    console.error("[DEBUG] Lookup Failed:", data);
+                    throw new Error(data.message || "Account not found.");
+                }
 
                 currentAccount = data.individualAccount;
                 renderConfirmation();
             } catch (e) {
-                alert(e.message);
+                alert("Error: " + e.message);
             } finally {
                 setLoading(false);
             }
@@ -73,7 +77,6 @@
             const actions = document.getElementById('action-area');
             const contact = currentAccount.primaryContact;
             
-            // NEON DROPDOWN LOGIC: Check value OR optionValues array
             const waiver = (currentAccount.accountCustomFields || []).find(f => f.id === WAIVER_FIELD_ID);
             const isSigned = (waiver && waiver.value && waiver.value.trim() !== "") || 
                              (waiver && waiver.optionValues && waiver.optionValues.length > 0);
@@ -100,24 +103,37 @@
         async function confirmCheckIn() {
             setLoading(true, "Checking you in...");
             const now = new Date();
+            const payload = {
+                subject: "Check-In",
+                status: "Completed",
+                accountId: currentAccount.accountId,
+                assignedTo: SYSTEM_USER_ID,
+                startDate: now.toISOString().split('T')[0],
+                startTime: now.toTimeString().split(' ')[0].substring(0, 5)
+            };
+
+            console.log("[DEBUG] Submitting Activity Payload:", payload);
+
             try {
-                // Post activity to Neon
-                await fetch(`${API_PROXY_URL}/api/v2/activities`, {
+                const response = await fetch(`${API_PROXY_URL}/api/v2/activities`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        subject: "Check-In",
-                        status: "Completed",
-                        accountId: currentAccount.accountId,
-                        assignedTo: SYSTEM_USER_ID,
-                        startDate: now.toISOString().split('T')[0],
-                        startTime: now.toTimeString().split(' ')[0].substring(0, 5)
-                    })
+                    body: JSON.stringify(payload)
                 });
+                
+                const result = await response.json();
+                console.log("[DEBUG] Activity Response:", result);
+
+                if (!response.ok) {
+                    const errorMsg = result.message || (result.errors && result.errors[0].message) || "Unknown Neon Error";
+                    throw new Error(`Status ${response.status}: ${errorMsg}`);
+                }
+
                 document.getElementById('success-msg').textContent = `${currentAccount.primaryContact.firstName} is checked in!`;
                 showStage('stage-success');
             } catch (e) {
-                alert("Check-in failed.");
+                console.error("[DEBUG] Check-in Error:", e);
+                alert("Check-in failed: " + e.message);
             } finally {
                 setLoading(false);
             }
