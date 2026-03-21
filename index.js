@@ -19,10 +19,10 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// BULK FETCH: Pulls the first 200 accounts to build the lookup table
 app.get('/discovery/bulk-accounts', async (req, res) => {
+    const page = req.query.page || 0;
     try {
-        const response = await fetch('https://api.neoncrm.com/v2/accounts?pageSize=200&userType=INDIVIDUAL', {
+        const response = await fetch(`https://api.neoncrm.com/v2/accounts?pageSize=200&currentPage=${page}&userType=INDIVIDUAL`, {
             headers: { 'Authorization': `Basic ${getNeonAuth()}` }
         });
         const data = await response.json();
