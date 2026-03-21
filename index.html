@@ -45,7 +45,7 @@
     <script>
         const API_PROXY_URL = window.location.origin;
         const WAIVER_FIELD_ID = "87";
-        const SYSTEM_USER_ID = "1153";
+        const SYSTEM_USER_ID = "1153"; 
         let currentAccount = null;
 
         async function handleIdLookup() {
@@ -53,20 +53,16 @@
             if (!id) return alert("Please enter an Account ID.");
 
             setLoading(true, "Finding account...");
-            console.log(`[DEBUG] Looking up account ID: ${id}`);
             try {
                 const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/${id}`);
                 const data = await res.json();
 
-                if (!res.ok) {
-                    console.error("[DEBUG] Lookup Failed:", data);
-                    throw new Error(data.message || "Account not found.");
-                }
+                if (!res.ok || !data.individualAccount) throw new Error("Account not found.");
 
                 currentAccount = data.individualAccount;
                 renderConfirmation();
             } catch (e) {
-                alert("Error: " + e.message);
+                alert("Lookup Error: " + e.message);
             } finally {
                 setLoading(false);
             }
@@ -103,16 +99,33 @@
         async function confirmCheckIn() {
             setLoading(true, "Checking you in...");
             const now = new Date();
+            
+            // Format to YYYY-MM-DD and HH:mm per Neon requirements
+            const dateStr = now.toISOString().split('T')[0];
+            const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
+
+            // UPDATED PAYLOAD TO MATCH SCHEMA
             const payload = {
-                subject: "Check-In",
-                status: "Completed",
-                accountId: currentAccount.accountId,
-                assignedTo: SYSTEM_USER_ID,
-                startDate: now.toISOString().split('T')[0],
-                startTime: now.toTimeString().split(' ')[0].substring(0, 5)
+                "subject": "Check-In",
+                "activityDates": {
+                    "startDate": dateStr,
+                    "startTime": timeStr
+                },
+                "clientAccount": [
+                    {
+                        "accountId": String(currentAccount.accountId)
+                    }
+                ],
+                "systemUserId": [
+                    String(SYSTEM_USER_ID)
+                ],
+                "status": {
+                    "name": "Completed"
+                },
+                "priority": "Medium"
             };
 
-            console.log("[DEBUG] Submitting Activity Payload:", payload);
+            console.log("[DEBUG] Sending Payload:", JSON.stringify(payload));
 
             try {
                 const response = await fetch(`${API_PROXY_URL}/api/v2/activities`, {
@@ -122,17 +135,23 @@
                 });
                 
                 const result = await response.json();
-                console.log("[DEBUG] Activity Response:", result);
+                console.log("[DEBUG] Server Response:", result);
 
                 if (!response.ok) {
-                    const errorMsg = result.message || (result.errors && result.errors[0].message) || "Unknown Neon Error";
-                    throw new Error(`Status ${response.status}: ${errorMsg}`);
+                    // Extract the specific Neon error detail if provided in the response
+                    let errorMessage = "Unknown Neon Error";
+                    if (result.errors && result.errors.length > 0) {
+                        errorMessage = `${result.errors[0].code}: ${result.errors[0].message}`;
+                    } else if (result.message) {
+                        errorMessage = result.message;
+                    }
+                    throw new Error(errorMessage);
                 }
 
                 document.getElementById('success-msg').textContent = `${currentAccount.primaryContact.firstName} is checked in!`;
                 showStage('stage-success');
             } catch (e) {
-                console.error("[DEBUG] Check-in Error:", e);
+                console.error("[DEBUG] Check-in Exception:", e);
                 alert("Check-in failed: " + e.message);
             } finally {
                 setLoading(false);
