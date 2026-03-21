@@ -17,7 +17,7 @@
     <div id="main-container" class="w-full max-w-xl bg-white p-8 rounded-2xl shadow-lg text-center">
         <div id="stage-search" class="stage active-stage">
             <h1 class="text-4xl font-bold text-gray-800">Customer Check-In</h1>
-            <p class="text-gray-500 my-4">Enter your phone number to begin.</p>
+            <p class="text-gray-500 my-4">Enter your phone number (10 digits or last 4).</p>
             <input type="tel" id="search-input" class="w-full p-4 text-2xl border rounded-md mb-4 text-center" placeholder="5555555555">
             <button onclick="searchAccounts()" class="w-full py-4 bg-cyan-600 text-white rounded-xl text-xl hover:bg-cyan-700 transition">Search</button>
         </div>
@@ -50,18 +50,28 @@
 
         async function searchAccounts() {
             const phone = document.getElementById('search-input').value.replace(/\D/g, '');
-            if (!phone) return;
+            if (phone.length < 4) {
+                alert("Please enter at least 4 digits.");
+                return;
+            }
 
             setLoading(true, 'Searching Neon CRM...');
             
             try {
+                // We use "CONTAIN" operator to be flexible with (555) vs 555
                 const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/search`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         searchFields: [{ field: "Phone", operator: "CONTAIN", value: phone }],
-                        // Added Common Custom Fields to output
-                        outputFields: ["First Name", "Last Name", "Account ID", "Account Custom Fields", "Common Custom Fields"]
+                        outputFields: [
+                            "First Name", 
+                            "Last Name", 
+                            "Account ID", 
+                            "Account Custom Fields", 
+                            "Common Custom Fields", 
+                            "Individual Custom Fields"
+                        ]
                     })
                 });
                 const data = await res.json();
@@ -78,23 +88,32 @@
             list.innerHTML = '';
             
             if (accounts.length === 0) {
-                list.innerHTML = '<p class="text-gray-500 py-4">No accounts found. Please ensure your number is correct in your profile.</p>';
+                list.innerHTML = '<p class="text-gray-500 py-4 font-semibold text-lg">No accounts found.</p>';
+                showStage('stage-results');
+                return;
             }
 
             accounts.forEach(acc => {
-                // Check for Waiver in both Account and Common field arrays
-                const allFields = [...(acc["Account Custom Fields"] || []), ...(acc["Common Custom Fields"] || [])];
-                const waiverField = allFields.find(f => f.fieldName === "Waiver Agreement");
+                const allFields = [
+                    ...(acc["Account Custom Fields"] || []), 
+                    ...(acc["Common Custom Fields"] || []),
+                    ...(acc["Individual Custom Fields"] || [])
+                ];
                 
-                // Consider signed if field exists and has ANY value
+                // Fuzzy Search for the Waiver field
+                const waiverField = allFields.find(f => 
+                    f.fieldName && (f.fieldName.toLowerCase().includes("waiver"))
+                );
+                
+                // If the field is found and has a value, it's signed
                 const isSigned = waiverField && waiverField.value && waiverField.value.trim() !== "";
 
                 const div = document.createElement('div');
-                div.className = `p-4 border-2 rounded-xl cursor-pointer text-xl font-bold transition-all ${!isSigned ? 'opacity-50' : ''}`;
+                div.className = `p-4 border-2 rounded-xl cursor-pointer text-xl font-bold transition-all ${!isSigned ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`;
                 
                 if (!isSigned) {
-                    div.innerHTML = `${acc["First Name"]} ${acc["Last Name"]} <br><span class="text-sm text-red-500 font-normal">Waiver Required</span>`;
-                    div.onclick = () => alert("Please sign the waiver at the front desk to continue.");
+                    div.innerHTML = `${acc["First Name"]} ${acc["Last Name"]} <br><span class="text-sm text-red-600 font-normal">Waiver Missing</span>`;
+                    div.onclick = () => alert("Please sign the waiver to check in.");
                 } else {
                     div.textContent = `${acc["First Name"]} ${acc["Last Name"]}`;
                     div.onclick = () => toggleSelect(acc, div);
