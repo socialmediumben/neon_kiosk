@@ -102,6 +102,7 @@
         }
 
         async function searchAccountsByName(lastName) {
+            // Updated with mandatory pagination object
             const searchPayload = {
                 "searchFields": [
                     {
@@ -110,7 +111,11 @@
                         "value": lastName
                     }
                 ],
-                "outputFields": ["First Name", "Last Name", "Account ID"]
+                "outputFields": ["First Name", "Last Name", "Account ID"],
+                "pagination": {
+                    "currentPage": 0,
+                    "pageSize": 20
+                }
             };
 
             const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/search`, {
@@ -120,23 +125,19 @@
             });
 
             const data = await res.json();
-            
-            // DEBUG: SHOW THE FULL JSON FROM NEON
-            console.log("--- FULL NEON SEARCH RESPONSE ---");
-            console.log(JSON.stringify(data, null, 2));
-
-            const accounts = data.searchResults || [];
+            console.log("--- FULL NEON SEARCH RESPONSE ---", data);
 
             if (!res.ok) {
-                const msg = data.errors ? data.errors[0].message : "Neon Search Failed";
-                throw new Error(msg);
+                // Handle the case where Neon returns an error array
+                const error = Array.isArray(data) ? data[0] : data;
+                throw new Error(error.message || "Search failed");
             }
 
+            const accounts = data.searchResults || [];
             if (accounts.length === 0) throw new Error("No accounts found with that name.");
             
             if (accounts.length === 1) {
-                const id = accounts[0]["Account ID"] || accounts[0].accountId;
-                await fetchAccountById(id);
+                await fetchAccountById(accounts[0]["Account ID"]);
             } else {
                 renderResultsList(accounts);
             }
@@ -146,19 +147,15 @@
             const list = document.getElementById('results-list');
             list.innerHTML = "";
             accounts.forEach(acc => {
-                const firstName = acc["First Name"] || acc.firstName || "Unknown";
-                const lastName = acc["Last Name"] || acc.lastName || "Unknown";
-                const accountId = acc["Account ID"] || acc.accountId;
-
                 const btn = document.createElement('button');
                 btn.className = "w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-left hover:bg-cyan-50 hover:border-cyan-300 transition-all";
                 btn.innerHTML = `
-                    <div class="font-bold text-gray-800">${firstName} ${lastName}</div>
-                    <div class="text-sm text-gray-400">ID: ${accountId}</div>
+                    <div class="font-bold text-gray-800">${acc["First Name"]} ${acc["Last Name"]}</div>
+                    <div class="text-sm text-gray-400">ID: ${acc["Account ID"]}</div>
                 `;
                 btn.onclick = () => {
                     setLoading(true, "Loading profile...");
-                    fetchAccountById(accountId).finally(() => setLoading(false));
+                    fetchAccountById(acc["Account ID"]).finally(() => setLoading(false));
                 };
                 list.appendChild(btn);
             });
