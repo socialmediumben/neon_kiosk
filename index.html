@@ -11,7 +11,7 @@
         .active-stage { display: block; }
         .spinner { border: 4px solid rgba(0,0,0,0.1); width: 32px; height: 32px; border-radius: 50%; border-left-color: #0891b2; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #qrcode img { margin: 0 auto; }
+        .qrcode-container img { margin: 0 auto; }
     </style>
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4 text-center">
@@ -22,7 +22,24 @@
             <h1 class="text-4xl font-extrabold text-gray-800 mb-2">Check-In</h1>
             <p class="text-gray-500 mb-8">Enter your Neon Account ID to begin.</p>
             <input type="number" id="id-input" class="w-full p-5 text-4xl border-2 border-gray-100 rounded-2xl mb-6 text-center focus:border-cyan-500 outline-none transition-all" placeholder="1147">
-            <button onclick="handleIdLookup()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold hover:bg-cyan-700 shadow-lg">Lookup Account</button>
+            <button onclick="handleIdLookup()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold hover:bg-cyan-700 shadow-lg mb-6">Lookup Account</button>
+            
+            <div class="border-t border-gray-100 pt-6">
+                <p class="text-gray-400 mb-4 font-medium">New here or haven't signed yet?</p>
+                <button onclick="showWaiverOnly()" class="w-full py-4 bg-emerald-600 text-white rounded-2xl text-xl font-bold hover:bg-emerald-700 shadow-md">Sign the Waiver</button>
+            </div>
+        </div>
+
+        <div id="stage-waiver" class="stage">
+            <h1 class="text-3xl font-bold text-gray-800 mb-4">Sign Waiver</h1>
+            <p class="text-gray-600 mb-6">Scan the code below or use the link to complete your waiver.</p>
+            <div id="qrcode-direct" class="qrcode-container mb-6 flex justify-center bg-white p-4 rounded-lg inline-block mx-auto border border-gray-100"></div>
+            <div class="mb-8">
+                <a href="https://socialmedium.app.neoncrm.com/forms/waiver" target="_blank" class="text-cyan-600 font-bold text-lg underline break-all">
+                    socialmedium.app.neoncrm.com/forms/waiver
+                </a>
+            </div>
+            <button onclick="showStage('stage-search')" class="w-full py-4 bg-gray-200 text-gray-700 rounded-2xl text-xl font-bold">Back to Check-In</button>
         </div>
 
         <div id="stage-confirm" class="stage">
@@ -54,7 +71,6 @@
         async function handleIdLookup() {
             const id = document.getElementById('id-input').value.trim();
             if (!id) return alert("Please enter an Account ID.");
-
             setLoading(true, "Finding account...");
             try {
                 const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/${id}`);
@@ -67,6 +83,21 @@
             } finally {
                 setLoading(false);
             }
+        }
+
+        function showWaiverOnly() {
+            showStage('stage-waiver');
+            generateWaiverQR("qrcode-direct");
+        }
+
+        function generateWaiverQR(elementId) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = ""; // Clear existing
+            new QRCode(container, {
+                text: WAIVER_URL,
+                width: 180,
+                height: 180
+            });
         }
 
         function renderConfirmation() {
@@ -86,30 +117,18 @@
             if (isSigned) {
                 actions.innerHTML = `
                     <div class="bg-green-50 text-green-700 p-4 rounded-xl mb-6 font-medium text-lg">✓ Waiver Verified</div>
-                    <button onclick="confirmCheckIn()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold shadow-lg hover:bg-cyan-700">Confirm Check-In</button>
+                    <button onclick="confirmCheckIn()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold shadow-lg">Confirm Check-In</button>
                 `;
             } else {
                 actions.innerHTML = `
                     <div class="bg-red-50 text-red-700 p-6 rounded-xl mb-6">
                         <div class="font-bold text-xl mb-2">⚠ Waiver Required</div>
-                        <p class="text-gray-600 mb-6">Please sign our waiver to continue.</p>
-                        
-                        <div id="qrcode" class="mb-6 flex justify-center bg-white p-4 rounded-lg inline-block mx-auto"></div>
-                        
-                        <a href="${WAIVER_URL}" target="_blank" class="text-cyan-600 font-bold text-lg underline break-all">
-                            Sign Waiver Here
-                        </a>
+                        <p class="text-gray-600 mb-6">Please scan to complete your waiver.</p>
+                        <div id="qrcode-confirm" class="qrcode-container mb-6 flex justify-center bg-white p-4 rounded-lg inline-block mx-auto"></div>
+                        <a href="${WAIVER_URL}" target="_blank" class="text-cyan-600 font-bold underline">Open Link</a>
                     </div>
                 `;
-                
-                // Generate QR Code after the HTML is injected
-                setTimeout(() => {
-                    new QRCode(document.getElementById("qrcode"), {
-                        text: WAIVER_URL,
-                        width: 160,
-                        height: 160
-                    });
-                }, 50);
+                setTimeout(() => generateWaiverQR("qrcode-confirm"), 50);
             }
             showStage('stage-confirm');
         }
@@ -117,25 +136,14 @@
         async function confirmCheckIn() {
             setLoading(true, "Checking you in...");
             const now = new Date();
-            
             const dateOptions = { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' };
             const parts = new Intl.DateTimeFormat('en-US', dateOptions).formatToParts(now);
             const dateStr = `${parts.find(p => p.type === 'year').value}-${parts.find(p => p.type === 'month').value}-${parts.find(p => p.type === 'day').value}`;
-            
-            const timeStr = now.toLocaleTimeString('en-US', { 
-                timeZone: 'America/Los_Angeles',
-                hour: 'numeric', 
-                minute: '2-digit', 
-                hour12: true 
-            });
+            const timeStr = now.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true });
 
             const payload = {
                 "subject": "Check-In",
-                "activityDates": {
-                    "startDate": dateStr,
-                    "startTime": timeStr,
-                    "timeZone": { "id": "1" } 
-                },
+                "activityDates": { "startDate": dateStr, "startTime": timeStr, "timeZone": { "id": "1" } },
                 "clientAccount": [{ "accountId": String(currentAccount.accountId) }],
                 "systemUserId": [ String(SYSTEM_USER_ID) ],
                 "status": { "id": "4" },
