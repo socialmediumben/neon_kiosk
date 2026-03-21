@@ -15,17 +15,12 @@
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4 text-center">
 
     <div id="main-container" class="w-full max-w-lg bg-white p-10 rounded-3xl shadow-2xl">
+        
         <div id="stage-search" class="stage active-stage">
             <h1 class="text-4xl font-extrabold text-gray-800 mb-2">Check-In</h1>
-            <p class="text-gray-500 mb-8">Enter your Neon Account ID.</p>
-            <input type="number" id="id-input" class="w-full p-5 text-4xl border-2 border-gray-100 rounded-2xl mb-6 text-center" placeholder="1147">
-            <button onclick="handleIdLookup()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold">Lookup Account</button>
-            
-            <div class="mt-10 pt-6 border-t border-gray-100">
-                <p class="text-xs text-gray-400 mb-2 uppercase font-bold tracking-widest">Debug Tool</p>
-                <input type="number" id="debug-id-input" class="w-full p-2 text-sm border rounded-lg mb-2 text-center" placeholder="Manual Activity ID">
-                <button onclick="debugManualActivity()" class="text-xs text-cyan-600 font-bold hover:underline">Inspect Manual Activity Structure</button>
-            </div>
+            <p class="text-gray-500 mb-8">Enter your Neon Account ID to begin.</p>
+            <input type="number" id="id-input" class="w-full p-5 text-4xl border-2 border-gray-100 rounded-2xl mb-6 text-center focus:border-cyan-500 outline-none transition-all" placeholder="1147">
+            <button onclick="handleIdLookup()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold hover:bg-cyan-700 shadow-lg">Lookup Account</button>
         </div>
 
         <div id="stage-confirm" class="stage">
@@ -50,31 +45,14 @@
     <script>
         const API_PROXY_URL = window.location.origin;
         const WAIVER_FIELD_ID = "87";
-        const SYSTEM_USER_ID = "1153"; 
+        // UPDATED: Based on your successful manual entry
+        const SYSTEM_USER_ID = "3508"; 
         let currentAccount = null;
-
-        // NEW DEBUG FUNCTION: Fetches the manual activity to see how it's built
-        async function debugManualActivity() {
-            const id = document.getElementById('debug-id-input').value.trim();
-            if (!id) return alert("Enter the ID of the activity you manually created.");
-            
-            setLoading(true, "Inspecting activity...");
-            try {
-                const res = await fetch(`${API_PROXY_URL}/api/v2/activities/${id}`);
-                const data = await res.json();
-                console.log("--- MANUAL ACTIVITY STRUCTURE ---");
-                console.log(data);
-                alert("Structure logged to Browser Console (F12). Look for 'status' and 'systemUserId'.");
-            } catch (e) {
-                alert("Debug Fetch Failed: " + e.message);
-            } finally {
-                setLoading(false);
-            }
-        }
 
         async function handleIdLookup() {
             const id = document.getElementById('id-input').value.trim();
             if (!id) return alert("Please enter an Account ID.");
+
             setLoading(true, "Finding account...");
             try {
                 const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/${id}`);
@@ -105,10 +83,13 @@
             if (isSigned) {
                 actions.innerHTML = `
                     <div class="bg-green-50 text-green-700 p-4 rounded-xl mb-6 font-medium text-lg">✓ Waiver Verified</div>
-                    <button onclick="confirmCheckIn()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold shadow-lg">Confirm Check-In</button>
+                    <button onclick="confirmCheckIn()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold shadow-lg hover:bg-cyan-700">Confirm Check-In</button>
                 `;
             } else {
-                actions.innerHTML = `<div class="bg-red-50 text-red-700 p-4 rounded-xl mb-6 font-medium text-lg">⚠ Waiver Required</div>`;
+                actions.innerHTML = `
+                    <div class="bg-red-50 text-red-700 p-4 rounded-xl mb-6 font-medium text-lg">⚠ Waiver Required</div>
+                    <p class="text-gray-600 mb-6 px-4">Missing signed waiver. Please see a staff member.</p>
+                `;
             }
             showStage('stage-confirm');
         }
@@ -116,19 +97,34 @@
         async function confirmCheckIn() {
             setLoading(true, "Checking you in...");
             const now = new Date();
-            const dateStr = now.toISOString(); 
+            
+            // Format Date: YYYY-MM-DD
+            const dateStr = now.toISOString().split('T')[0];
+            
+            // Format Time: h:mm A (e.g., "5:41 AM") to match your manual success entry
+            const timeStr = now.toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit', 
+                hour12: true 
+            });
 
+            // UPDATED: Matches your successful manual activity exactly
             const payload = {
                 "subject": "Check-In",
                 "activityDates": {
                     "startDate": dateStr,
+                    "startTime": timeStr,
                     "timeZone": { "id": "1" }
                 },
-                "clientAccount": [{ "accountId": String(currentAccount.accountId) }],
-                "systemUserId": [String(SYSTEM_USER_ID)],
-                "status": { "id": "1" }, 
+                "clientAccount": [
+                    { "accountId": String(currentAccount.accountId) }
+                ],
+                "systemUserId": [ String(SYSTEM_USER_ID) ],
+                "status": { "id": "4" }, // Correct ID for 'Completed' status
                 "priority": "Low"
             };
+
+            console.log("[DEBUG] Sending Payload:", JSON.stringify(payload));
 
             try {
                 const response = await fetch(`${API_PROXY_URL}/api/v2/activities`, {
@@ -136,11 +132,15 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
+                
                 const result = await response.json();
+                console.log("[DEBUG] Result:", result);
+
                 if (!response.ok) {
-                    let errorMessage = result.errors ? result.errors.map(e => e.message).join(", ") : "Check-in failed";
-                    throw new Error(errorMessage);
+                    const errorMsg = result.errors ? result.errors.map(e => e.message).join(", ") : "Check-in failed";
+                    throw new Error(errorMsg);
                 }
+
                 document.getElementById('success-msg').textContent = `${currentAccount.primaryContact.firstName} is checked in!`;
                 showStage('stage-success');
             } catch (e) {
