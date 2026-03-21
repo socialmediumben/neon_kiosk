@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 const app = express();
@@ -12,10 +13,18 @@ app.use(express.json());
 const getNeonAuth = () => {
     const orgId = process.env.NEON_ORG_ID;
     const apiKey = process.env.NEON_API_KEY;
+    if (!orgId || !apiKey) {
+        console.error("Missing NEON_ORG_ID or NEON_API_KEY environment variables.");
+    }
     return Buffer.from(`${orgId}:${apiKey}`).toString('base64');
 };
 
-// DISCOVERY ROUTE: Visit this to find your Waiver Field ID
+// SERVE FRONTEND: This fixes the "Cannot GET /" error
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// DISCOVERY ROUTE: Visit https://neon-kiosk.onrender.com/discovery/fields
 app.get('/discovery/fields', async (req, res) => {
     try {
         const response = await fetch('https://api.neoncrm.com/v2/customFields?category=Individual', {
@@ -28,7 +37,7 @@ app.get('/discovery/fields', async (req, res) => {
     }
 });
 
-// MAIN PROXY ROUTE: Forwards all /api/ requests to Neon CRM v2
+// MAIN PROXY ROUTE: Forwards all /api/* requests to Neon CRM v2
 app.all('/api/*', async (req, res) => {
     try {
         const neonPath = req.path.replace('/api', '');
