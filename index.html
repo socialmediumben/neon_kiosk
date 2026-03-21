@@ -98,22 +98,22 @@
             const now = new Date();
             const dateStr = now.toISOString(); 
 
-            // Payload adjusted for timeZone and priority requirements
+            // Payload updated with priority: "Low" and required timeZone object
             const payload = {
                 "subject": "Check-In",
                 "activityDates": {
                     "startDate": dateStr,
                     "timeZone": {
-                        "id": "1" // Standard ID for UTC or your primary Neon timezone
+                        "id": "1" // Standard ID, often UTC or primary system timezone
                     }
                 },
                 "clientAccount": [{ "accountId": String(currentAccount.accountId) }],
                 "systemUserId": [String(SYSTEM_USER_ID)],
                 "status": { "id": "1" },
-                "priority": "Medium" // Required field set to valid string
+                "priority": "Low" // Priority set to "Low" as requested
             };
 
-            console.log("[DEBUG] Payload:", JSON.stringify(payload));
+            console.log("[DEBUG] Sending Payload:", JSON.stringify(payload));
 
             try {
                 const response = await fetch(`${API_PROXY_URL}/api/v2/activities`, {
