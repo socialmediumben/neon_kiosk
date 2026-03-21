@@ -19,23 +19,37 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// UPDATED: Fetches ALL fields to ensure we find the Waiver
+// DISCOVERY: Individual Fields
 app.get('/discovery/fields', async (req, res) => {
     try {
-        const response = await fetch('https://api.neoncrm.com/v2/customFields', {
+        const response = await fetch('https://api.neoncrm.com/v2/customFields?category=Individual', {
             headers: { 'Authorization': `Basic ${getNeonAuth()}` }
         });
         const data = await response.json();
         res.json(data);
     } catch (err) {
-        res.status(500).json({ error: 'Failed to fetch fields: ' + err.message });
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// NEW DISCOVERY: Common Fields (Check here for "Any" account type fields)
+app.get('/discovery/common', async (req, res) => {
+    try {
+        const response = await fetch('https://api.neoncrm.com/v2/customFields?category=Common', {
+            headers: { 'Authorization': `Basic ${getNeonAuth()}` }
+        });
+        const data = await response.json();
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
 app.all('/api/*', async (req, res) => {
     try {
         const neonPath = req.path.replace('/api', '');
-        const url = `https://api.neoncrm.com${neonPath}`;
+        const url = `https://api.neoncrm.com${neonPath}${req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''}`;
+        
         const fetchOptions = {
             method: req.method,
             headers: {
@@ -43,9 +57,11 @@ app.all('/api/*', async (req, res) => {
                 'Content-Type': 'application/json'
             }
         };
+
         if (['POST', 'PATCH', 'PUT'].includes(req.method)) {
             fetchOptions.body = JSON.stringify(req.body);
         }
+
         const response = await fetch(url, fetchOptions);
         const data = await response.json();
         res.status(response.status).json(data);
