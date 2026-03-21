@@ -19,10 +19,10 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// DISCOVERY: Individual Fields
-app.get('/discovery/fields', async (req, res) => {
+// NEW DISCOVERY: Uses the endpoint you found to see what we can output
+app.get('/discovery/output-fields', async (req, res) => {
     try {
-        const response = await fetch('https://api.neoncrm.com/v2/customFields?category=Individual', {
+        const response = await fetch('https://api.neoncrm.com/v2/accounts/search/outputFields', {
             headers: { 'Authorization': `Basic ${getNeonAuth()}` }
         });
         const data = await response.json();
@@ -32,14 +32,17 @@ app.get('/discovery/fields', async (req, res) => {
     }
 });
 
-// NEW DISCOVERY: Common Fields (Check here for "Any" account type fields)
-app.get('/discovery/common', async (req, res) => {
+app.get('/discovery/all', async (req, res) => {
+    const categories = ['Individual', 'Account', 'Common'];
+    const results = {};
     try {
-        const response = await fetch('https://api.neoncrm.com/v2/customFields?category=Common', {
-            headers: { 'Authorization': `Basic ${getNeonAuth()}` }
-        });
-        const data = await response.json();
-        res.json(data);
+        for (const cat of categories) {
+            const response = await fetch(`https://api.neoncrm.com/v2/customFields?category=${cat}`, {
+                headers: { 'Authorization': `Basic ${getNeonAuth()}` }
+            });
+            results[cat] = await response.json();
+        }
+        res.json(results);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -49,7 +52,6 @@ app.all('/api/*', async (req, res) => {
     try {
         const neonPath = req.path.replace('/api', '');
         const url = `https://api.neoncrm.com${neonPath}${req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''}`;
-        
         const fetchOptions = {
             method: req.method,
             headers: {
@@ -57,11 +59,9 @@ app.all('/api/*', async (req, res) => {
                 'Content-Type': 'application/json'
             }
         };
-
         if (['POST', 'PATCH', 'PUT'].includes(req.method)) {
             fetchOptions.body = JSON.stringify(req.body);
         }
-
         const response = await fetch(url, fetchOptions);
         const data = await response.json();
         res.status(response.status).json(data);
