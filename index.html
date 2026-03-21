@@ -44,17 +44,13 @@
     </div>
 
     <script>
-        // --- CONFIGURATION ---
-        const API_PROXY_URL = 'https://neon-kiosk.onrender.com'; // Update if your URL changes
-        const WAIVER_FIELD_ID = 'PASTE_FIELD_ID_HERE'; // Find this via /discovery/fields
+        const API_PROXY_URL = window.location.origin; 
         const SYSTEM_USER_ID = "1153";
-
         let selectedAccounts = [];
 
         async function searchAccounts() {
             const phone = document.getElementById('search-input').value.replace(/\D/g, '');
             if (!phone) return;
-
             setLoading(true, 'Searching Neon CRM...');
             
             try {
@@ -63,7 +59,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         searchFields: [{ field: "Phone", operator: "CONTAIN", value: phone }],
-                        outputFields: ["First Name", "Last Name", "Account ID", "Waiver Agreement"]
+                        // We fetch Account Custom Fields generically
+                        outputFields: ["First Name", "Last Name", "Account ID", "Account Custom Fields"]
                     })
                 });
                 const data = await res.json();
@@ -84,10 +81,21 @@
             }
 
             accounts.forEach(acc => {
+                // Check if "Waiver Agreement" exists in the custom fields array
+                const customFields = acc["Account Custom Fields"] || [];
+                const waiverField = customFields.find(f => f.fieldName === "Waiver Agreement");
+                const isSigned = waiverField && waiverField.value && waiverField.value.trim() !== "";
+
                 const div = document.createElement('div');
-                div.className = "p-4 border-2 rounded-xl cursor-pointer text-xl font-bold transition-all";
-                div.textContent = `${acc["First Name"]} ${acc["Last Name"]}`;
-                div.onclick = () => toggleSelect(acc, div);
+                div.className = `p-4 border-2 rounded-xl cursor-pointer text-xl font-bold transition-all ${!isSigned ? 'opacity-50' : ''}`;
+                
+                if (!isSigned) {
+                    div.innerHTML = `${acc["First Name"]} ${acc["Last Name"]} <br><span class="text-sm text-red-500 font-normal">Waiver Required</span>`;
+                    div.onclick = () => alert("This person needs to sign the waiver before checking in.");
+                } else {
+                    div.textContent = `${acc["First Name"]} ${acc["Last Name"]}`;
+                    div.onclick = () => toggleSelect(acc, div);
+                }
                 list.appendChild(div);
             });
             showStage('stage-results');
@@ -102,21 +110,16 @@
                 selectedAccounts.push(acc);
                 element.classList.add('bg-cyan-50', 'border-cyan-600');
             }
-            
             const btn = document.getElementById('checkin-btn');
             btn.disabled = selectedAccounts.length === 0;
-            btn.className = selectedAccounts.length === 0 
-                ? "flex-[2] py-4 bg-gray-400 text-white rounded-xl text-xl" 
-                : "flex-[2] py-4 bg-cyan-600 text-white rounded-xl text-xl hover:bg-cyan-700";
+            btn.className = selectedAccounts.length === 0 ? "flex-[2] py-4 bg-gray-400 text-white rounded-xl text-xl" : "flex-[2] py-4 bg-cyan-600 text-white rounded-xl text-xl";
         }
 
         async function checkInSelected() {
             setLoading(true, 'Recording Check-In...');
             const now = new Date();
-            
             try {
                 for (const acc of selectedAccounts) {
-                    // Create Neon Activity
                     await fetch(`${API_PROXY_URL}/api/v2/activities`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -146,12 +149,7 @@
         function setLoading(isLoading, text = 'Loading...') {
             const loader = document.getElementById('loader');
             document.getElementById('loader-text').textContent = text;
-            if (isLoading) {
-                loader.classList.remove('hidden');
-                document.getElementById('checkin-btn').disabled = true;
-            } else {
-                loader.classList.add('hidden');
-            }
+            loader.classList.toggle('hidden', !isLoading);
         }
     </script>
 </body>
