@@ -81,7 +81,6 @@
 
             setLoading(true, "Searching accounts...");
             try {
-                // If input is numeric, do ID lookup. Otherwise, do Name search.
                 if (/^\d+$/.test(input)) {
                     await fetchAccountById(input);
                 } else {
@@ -103,17 +102,32 @@
         }
 
         async function searchAccountsByName(lastName) {
-            const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/search?lastName=${lastName}`);
+            // Updated to use the mandatory POST searchRequest schema
+            const searchPayload = {
+                "searchFields": [
+                    {
+                        "field": "Last Name",
+                        "operator": "EQUAL",
+                        "value": lastName
+                    }
+                ],
+                "outputFields": ["First Name", "Last Name", "Account ID"]
+            };
+
+            const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/search`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(searchPayload)
+            });
+
             const data = await res.json();
             const accounts = data.searchResults || [];
 
             if (accounts.length === 0) throw new Error("No accounts found with that name.");
             
             if (accounts.length === 1) {
-                // If only one match, go straight to that account
-                await fetchAccountById(accounts[0].accountId);
+                await fetchAccountById(accounts[0]["Account ID"]);
             } else {
-                // If multiple matches, show a list
                 renderResultsList(accounts);
             }
         }
@@ -124,13 +138,14 @@
             accounts.forEach(acc => {
                 const btn = document.createElement('button');
                 btn.className = "w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-left hover:bg-cyan-50 hover:border-cyan-300 transition-all";
+                // Note: Neon API search results use keys exactly as requested in outputFields
                 btn.innerHTML = `
-                    <div class="font-bold text-gray-800">${acc.firstName} ${acc.lastName}</div>
-                    <div class="text-sm text-gray-400">ID: ${acc.accountId}</div>
+                    <div class="font-bold text-gray-800">${acc["First Name"]} ${acc["Last Name"]}</div>
+                    <div class="text-sm text-gray-400">ID: ${acc["Account ID"]}</div>
                 `;
                 btn.onclick = () => {
                     setLoading(true, "Loading profile...");
-                    fetchAccountById(acc.accountId).finally(() => setLoading(false));
+                    fetchAccountById(acc["Account ID"]).finally(() => setLoading(false));
                 };
                 list.appendChild(btn);
             });
