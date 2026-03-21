@@ -12,7 +12,6 @@
         .spinner { border: 4px solid rgba(0,0,0,0.1); width: 32px; height: 32px; border-radius: 50%; border-left-color: #0891b2; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Print Logic: Hide everything except the designated print area */
         @media print {
             body * { visibility: hidden; }
             #nametag-to-print, #nametag-to-print * { visibility: visible !important; }
@@ -29,7 +28,7 @@
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4 text-center">
 
-    <div id="main-container" class="w-full max-w-4xl bg-white p-10 rounded-3xl shadow-2xl no-print">
+    <div id="main-container" class="w-full max-w-5xl bg-white p-10 rounded-3xl shadow-2xl no-print">
         
         <div id="stage-search" class="stage active-stage">
             <h1 class="text-4xl font-extrabold text-gray-800 mb-2">Check-In</h1>
@@ -63,15 +62,24 @@
         </div>
 
         <div id="stage-success" class="stage">
-            <div class="flex items-center justify-center space-x-3 mb-4 text-green-600 no-print">
-                <span class="text-5xl">✅</span>
-                <h1 class="text-4xl font-bold">Success!</h1>
-            </div>
-            <p class="text-xl text-gray-600 mb-6 no-print" id="success-msg"></p>
-            
-            <div id="nametag-final-preview" class="mb-8"></div>
+            <div class="flex items-start justify-between w-full">
+                <div class="flex-1 text-left">
+                    <div class="flex items-center space-x-3 mb-2 text-green-600">
+                        <span class="text-4xl">✅</span>
+                        <h1 class="text-4xl font-bold">Success!</h1>
+                    </div>
+                    <p class="text-xl text-gray-600 mb-6" id="success-msg"></p>
+                    <div id="nametag-final-preview"></div>
+                </div>
 
-            <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 max-w-2xl mx-auto no-print">
+                <div class="ml-10 bg-cyan-50 p-6 rounded-3xl border border-cyan-100 text-center">
+                    <p class="text-cyan-800 font-bold mb-4">Upcoming Events</p>
+                    <div id="qrcode-events" class="mb-4 flex justify-center bg-white p-4 rounded-2xl"></div>
+                    <p class="text-xs text-cyan-600 max-w-[150px] mx-auto">Scan to view our event calendar!</p>
+                </div>
+            </div>
+
+            <div class="flex space-x-4 mt-8 no-print">
                 <button onclick="window.print()" class="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-2xl font-bold shadow-lg hover:bg-blue-700">Print Nametag</button>
                 <button onclick="location.reload()" class="flex-1 py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold hover:bg-cyan-700">Next Person <span id="timer">(30)</span></button>
             </div>
@@ -92,6 +100,7 @@
         const CUSTOM_INTERESTS_FIELD_ID = "83";
         const SYSTEM_USER_ID = "3508"; 
         const WAIVER_URL = "https://socialmedium.app.neoncrm.com/forms/waiver";
+        const EVENTS_URL = "https://socialmedium.app.neoncrm.com/np/constituent/eventList.do?orgId=socialmedium";
         let currentAccount = null;
 
         async function handleSearch() {
@@ -169,7 +178,7 @@
             const combinedInterests = [interests, customInterests].filter(i => i !== "").join(", ");
 
             return `
-                <div class="border-[12px] border-black rounded-[40px] p-12 text-left bg-white w-full max-w-3xl mx-auto aspect-[3/2] flex flex-col justify-between">
+                <div class="border-[12px] border-black rounded-[40px] p-12 text-left bg-white w-full max-w-3xl aspect-[3/2] flex flex-col justify-between">
                     <div>
                         <div class="flex justify-between items-start">
                             <div class="text-8xl font-black uppercase tracking-tighter text-black">${name}</div>
@@ -234,6 +243,12 @@
                 document.getElementById('nametag-to-print').innerHTML = finalTagHTML;
                 
                 showStage('stage-success');
+                
+                // RESTORED: Generate Events QR Code on Success
+                const eventContainer = document.getElementById("qrcode-events");
+                eventContainer.innerHTML = "";
+                new QRCode(eventContainer, { text: EVENTS_URL, width: 180, height: 180 });
+                
                 startResetTimer();
             } catch (e) {
                 alert("Error: " + e.message);
