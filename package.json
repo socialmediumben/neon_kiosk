@@ -1,0 +1,14 @@
+{
+  "name": "neon-kiosk-proxy",
+  "version": "1.0.0",
+  "description": "A proxy server for the Neon One CRM API.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "node-fetch": "^3.3.2"
+  }
+}
