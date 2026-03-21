@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Neon CRM Bulk Sync Test</title>
+    <title>Neon CRM Bulk Sync - Phone Version</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 p-8">
 
-    <div class="max-w-4xl mx-auto space-y-6">
+    <div class="max-w-5xl mx-auto space-y-6">
         <div class="bg-white p-8 rounded-2xl shadow-lg text-center">
             <h1 class="text-3xl font-bold mb-2">Neon CRM Sync</h1>
             <p id="sync-status" class="text-blue-600 font-semibold mb-6">Initializing sync...</p>
@@ -24,18 +24,17 @@
 
         <div id="table-container" class="hidden bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
             <h2 class="text-xl font-bold mb-4">Internal Lookup Table (<span id="count-display">0</span> records)</h2>
-            <div class="overflow-x-auto max-h-[500px] overflow-y-auto border rounded">
+            <div class="overflow-x-auto max-h-[600px] overflow-y-auto border rounded">
                 <table class="w-full text-left text-sm">
                     <thead class="bg-slate-50 sticky top-0">
                         <tr>
                             <th class="p-3 border-b">ID</th>
-                            <th class="p-3 border-b">First Name</th>
-                            <th class="p-3 border-b">Last Name</th>
+                            <th class="p-3 border-b">Name</th>
+                            <th class="p-3 border-b">Phone</th>
                             <th class="p-3 border-b">Email</th>
                         </tr>
                     </thead>
-                    <tbody id="table-body" class="divide-y">
-                        </tbody>
+                    <tbody id="table-body" class="divide-y"></tbody>
                 </table>
             </div>
         </div>
@@ -57,23 +56,23 @@
                     const res = await fetch(`${API_PROXY_URL}/discovery/bulk-accounts?page=${currentPage}`);
                     const data = await res.json();
 
-                    if (data.accounts) {
-                        accountLookupTable = accountLookupTable.concat(data.accounts);
+                    // Search results are returned in 'searchResults' for the POST search endpoint
+                    if (data.searchResults) {
+                        accountLookupTable = accountLookupTable.concat(data.searchResults);
                         totalPages = data.pagination.totalPages;
                         currentPage++;
                     } else {
-                        throw new Error("Invalid response from server");
+                        throw new Error("No search results found");
                     }
                 }
 
-                statusEl.textContent = `✅ Sync Complete: ${accountLookupTable.length} accounts loaded.`;
+                statusEl.textContent = `✅ Sync Complete: ${accountLookupTable.length} accounts loaded with Phone Numbers.`;
                 statusEl.className = "text-green-600 font-bold mb-6";
                 
-                // Enable the view button
                 const btn = document.getElementById('view-table-btn');
                 btn.disabled = false;
                 btn.classList.remove('opacity-50', 'bg-slate-800');
-                btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                btn.classList.add('bg-indigo-600');
                 
                 populateTable();
             } catch (e) {
@@ -88,17 +87,16 @@
             
             body.innerHTML = accountLookupTable.map(acc => `
                 <tr>
-                    <td class="p-3 font-mono text-xs">${acc.accountId}</td>
-                    <td class="p-3">${acc.firstName || ''}</td>
-                    <td class="p-3">${acc.lastName || ''}</td>
-                    <td class="p-3 text-slate-500">${acc.email || 'N/A'}</td>
+                    <td class="p-3 font-mono text-xs text-slate-400">${acc["Account ID"]}</td>
+                    <td class="p-3 font-bold">${acc["First Name"]} ${acc["Last Name"]}</td>
+                    <td class="p-3 text-blue-600 font-mono">${acc["Phone1"] || '—'}</td>
+                    <td class="p-3 text-slate-500">${acc["Email"] || '—'}</td>
                 </tr>
             `).join('');
         }
 
         function toggleTable() {
-            const container = document.getElementById('table-container');
-            container.classList.toggle('hidden');
+            document.getElementById('table-container').classList.toggle('hidden');
         }
     </script>
 </body>
