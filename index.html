@@ -56,9 +56,7 @@
             try {
                 const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/${id}`);
                 const data = await res.json();
-
                 if (!res.ok || !data.individualAccount) throw new Error("Account not found.");
-
                 currentAccount = data.individualAccount;
                 renderConfirmation();
             } catch (e) {
@@ -72,7 +70,6 @@
             const info = document.getElementById('account-info');
             const actions = document.getElementById('action-area');
             const contact = currentAccount.primaryContact;
-            
             const waiver = (currentAccount.accountCustomFields || []).find(f => f.id === WAIVER_FIELD_ID);
             const isSigned = (waiver && waiver.value && waiver.value.trim() !== "") || 
                              (waiver && waiver.optionValues && waiver.optionValues.length > 0);
@@ -90,7 +87,7 @@
             } else {
                 actions.innerHTML = `
                     <div class="bg-red-50 text-red-700 p-4 rounded-xl mb-6 font-medium text-lg text-balance">⚠ Waiver Required</div>
-                    <p class="text-gray-600 mb-6 px-4">Our records show you are missing a signed waiver. Please see a staff member to sign one.</p>
+                    <p class="text-gray-600 mb-6 px-4">Our records show you are missing a signed waiver.</p>
                 `;
             }
             showStage('stage-confirm');
@@ -100,32 +97,22 @@
             setLoading(true, "Checking you in...");
             const now = new Date();
             
-            // Format to YYYY-MM-DD and HH:mm per Neon requirements
-            const dateStr = now.toISOString().split('T')[0];
-            const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
+            // Neon CRM often requires a full ISO timestamp for activityDates.startDate
+            const fullIsoDate = now.toISOString(); 
 
-            // UPDATED PAYLOAD TO MATCH SCHEMA
             const payload = {
                 "subject": "Check-In",
                 "activityDates": {
-                    "startDate": dateStr,
-                    "startTime": timeStr
+                    "startDate": fullIsoDate
                 },
-                "clientAccount": [
-                    {
-                        "accountId": String(currentAccount.accountId)
-                    }
-                ],
-                "systemUserId": [
-                    String(SYSTEM_USER_ID)
-                ],
-                "status": {
-                    "name": "Completed"
-                },
+                "clientAccount": [{ "accountId": String(currentAccount.accountId) }],
+                "systemUserId": [String(SYSTEM_USER_ID)],
+                "status": { "id": "1" },      // Using ID instead of Name for "Completed"
+                "category": { "id": "1" },    // Many Neon instances require a Category ID
                 "priority": "Medium"
             };
 
-            console.log("[DEBUG] Sending Payload:", JSON.stringify(payload));
+            console.log("[DEBUG] Payload:", JSON.stringify(payload));
 
             try {
                 const response = await fetch(`${API_PROXY_URL}/api/v2/activities`, {
@@ -135,15 +122,14 @@
                 });
                 
                 const result = await response.json();
-                console.log("[DEBUG] Server Response:", result);
+                console.log("[DEBUG] Raw Neon Response:", result);
 
                 if (!response.ok) {
-                    // Extract the specific Neon error detail if provided in the response
-                    let errorMessage = "Unknown Neon Error";
-                    if (result.errors && result.errors.length > 0) {
-                        errorMessage = `${result.errors[0].code}: ${result.errors[0].message}`;
-                    } else if (result.message) {
-                        errorMessage = result.message;
+                    let errorMessage = "Check-in failed";
+                    if (Array.isArray(result)) {
+                        errorMessage = result.map(e => e.message).join(", ");
+                    } else if (result.errors) {
+                        errorMessage = result.errors.map(e => e.message).join(", ");
                     }
                     throw new Error(errorMessage);
                 }
@@ -151,8 +137,8 @@
                 document.getElementById('success-msg').textContent = `${currentAccount.primaryContact.firstName} is checked in!`;
                 showStage('stage-success');
             } catch (e) {
-                console.error("[DEBUG] Check-in Exception:", e);
-                alert("Check-in failed: " + e.message);
+                console.error("[DEBUG] Exception:", e);
+                alert("Error: " + e.message);
             } finally {
                 setLoading(false);
             }
