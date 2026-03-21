@@ -2,161 +2,61 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Check-In</title>
+    <title>Neon Phone Search Test</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .stage { display: none; }
-        .active-stage { display: block; }
-        .spinner { border: 4px solid rgba(0,0,0,0.1); width: 24px; height: 24px; border-radius: 50%; border-left-color: #0891b2; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
 </head>
-<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+<body class="bg-slate-100 flex items-center justify-center min-h-screen p-4">
 
-    <div id="main-container" class="w-full max-w-xl bg-white p-8 rounded-2xl shadow-lg text-center">
-        <div id="stage-search" class="stage active-stage">
-            <h1 class="text-4xl font-bold text-gray-800">Customer Check-In</h1>
-            <p class="text-gray-500 my-4">Please enter your phone number.</p>
-            <input type="tel" id="search-input" class="w-full p-4 text-2xl border rounded-md mb-4 text-center" placeholder="8186466823">
-            <button onclick="searchAccounts()" class="w-full py-4 bg-cyan-600 text-white rounded-xl text-xl font-bold hover:bg-cyan-700 transition">Search</button>
-        </div>
+    <div class="w-full max-w-lg bg-white p-8 rounded-2xl shadow-xl">
+        <h1 class="text-2xl font-bold text-center mb-6">Phone Search Test</h1>
+        
+        <p class="text-gray-500 text-sm mb-2 text-center text-balance">
+            Try searching for your digits (e.g., 8186466823).
+        </p>
+        <input type="tel" id="phone-input" class="w-full p-4 border rounded-lg mb-4 text-center text-xl" placeholder="8186466823">
+        
+        <button onclick="testPhoneSearch()" class="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700">
+            Search Phone1 (CONTAIN)
+        </button>
 
-        <div id="stage-results" class="stage">
-            <h1 class="text-3xl font-bold mb-6 text-gray-800">Who is here?</h1>
-            <div id="results-list" class="space-y-4"></div>
-            <div class="flex space-x-4 mt-8">
-                <button onclick="showStage('stage-search')" class="flex-1 py-4 border-2 rounded-xl text-xl">Back</button>
-                <button onclick="processCheckIn()" id="checkin-btn" disabled class="flex-[2] py-4 bg-gray-400 text-white rounded-xl text-xl font-bold">Check In</button>
-            </div>
-        </div>
-
-        <div id="stage-success" class="stage">
-            <h1 class="text-4xl font-bold text-green-600">Check-In Successful!</h1>
-            <p class="my-6 text-xl text-gray-600">Welcome to Social Medium.</p>
-            <button onclick="location.reload()" class="w-full py-4 bg-cyan-600 text-white rounded-xl text-xl font-bold">Done</button>
-        </div>
-
-        <div id="loader" class="hidden mt-6 flex flex-col items-center">
-            <div class="spinner"></div>
-            <p class="mt-2 text-gray-500" id="loader-text">Loading...</p>
+        <div class="mt-8 p-4 bg-black rounded-lg">
+            <p class="text-green-400 font-mono text-xs uppercase mb-2">Neon Response:</p>
+            <pre id="console" class="text-white font-mono text-sm overflow-auto max-h-96">Waiting for search...</pre>
         </div>
     </div>
 
     <script>
-        const API_PROXY_URL = window.location.origin;
-        const WAIVER_FIELD_ID = "87";
-        const SYSTEM_USER_ID = "1153";
-        let selectedAccounts = [];
-
-        async function searchAccounts() {
-            const phone = document.getElementById('search-input').value.replace(/\D/g, '');
-            if (phone.length < 4) return alert("Please enter at least 4 digits.");
-
-            setLoading(true, 'Searching Neon CRM...');
+        async function testPhoneSearch() {
+            // Clean the input to just digits for the search
+            const val = document.getElementById('phone-input').value.replace(/\D/g, '');
+            const output = document.getElementById('console');
+            output.textContent = `Searching Phone1 for "${val}"...`;
             
             try {
-                const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/search?userType=INDIVIDUAL`, {
+                const res = await fetch(`${window.location.origin}/api/v2/accounts/search?userType=INDIVIDUAL`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        pagination: { currentPage: 0, pageSize: 10, sortColumn: "Last Name", sortDirection: "ASC" },
-                        searchFields: [{ field: "Phone1", operator: "CONTAIN", value: phone }],
-                        outputFields: ["First Name", "Last Name", "Account ID", "Account Custom Fields"]
+                        pagination: {
+                            currentPage: 0,
+                            pageSize: 10,
+                            sortColumn: "Last Name",
+                            sortDirection: "ASC"
+                        },
+                        searchFields: [{
+                            field: "Phone1",
+                            operator: "CONTAIN",
+                            value: val
+                        }],
+                        outputFields: ["First Name", "Last Name", "Account ID"]
                     })
                 });
-                const data = await res.json();
-                renderResults(data.searchResults || []);
-            } catch (e) { 
-                alert("Search Error: " + e.message); 
-            } finally {
-                setLoading(false);
-            }
-        }
-
-        function renderResults(accounts) {
-            const list = document.getElementById('results-list');
-            list.innerHTML = '';
-            selectedAccounts = [];
-            
-            if (accounts.length === 0) {
-                list.innerHTML = '<p class="text-gray-500 py-4">No accounts found. Please see staff.</p>';
-            }
-
-            accounts.forEach(acc => {
-                // Waiver Logic: Check custom field ID 87
-                const customFields = acc["Account Custom Fields"] || [];
-                const waiver = customFields.find(f => f.id === WAIVER_FIELD_ID);
-                const isSigned = waiver && waiver.value && waiver.value.trim() !== "";
-
-                const div = document.createElement('div');
-                div.className = `p-4 border-2 rounded-xl cursor-pointer text-xl font-bold transition-all ${!isSigned ? 'bg-red-50 border-red-200 opacity-60' : 'bg-white'}`;
                 
-                if (!isSigned) {
-                    div.innerHTML = `${acc["First Name"]} ${acc["Last Name"]} <br><span class="text-sm text-red-600 font-normal">Waiver Missing</span>`;
-                    div.onclick = () => alert("This account is missing a signed waiver. Please sign the waiver at the front desk.");
-                } else {
-                    div.textContent = `${acc["First Name"]} ${acc["Last Name"]}`;
-                    div.onclick = () => toggleSelect(acc, div);
-                }
-                list.appendChild(div);
-            });
-            showStage('stage-results');
-        }
-
-        function toggleSelect(acc, element) {
-            const idx = selectedAccounts.findIndex(a => a["Account ID"] === acc["Account ID"]);
-            if(idx > -1) {
-                selectedAccounts.splice(idx, 1);
-                element.classList.remove('bg-cyan-50', 'border-cyan-600');
-            } else {
-                selectedAccounts.push(acc);
-                element.classList.add('bg-cyan-50', 'border-cyan-600');
-            }
-            document.getElementById('checkin-btn').disabled = selectedAccounts.length === 0;
-            document.getElementById('checkin-btn').className = selectedAccounts.length === 0 
-                ? "flex-[2] py-4 bg-gray-400 text-white rounded-xl text-xl font-bold" 
-                : "flex-[2] py-4 bg-cyan-600 text-white rounded-xl text-xl font-bold hover:bg-cyan-700";
-        }
-
-        async function processCheckIn() {
-            setLoading(true, 'Recording Check-In...');
-            const now = new Date();
-            const dateStr = now.toISOString().split('T')[0];
-            const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
-            
-            try {
-                for (const acc of selectedAccounts) {
-                    await fetch(`${API_PROXY_URL}/api/v2/activities`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            subject: "Check-In",
-                            status: "Completed",
-                            accountId: acc["Account ID"],
-                            assignedTo: SYSTEM_USER_ID,
-                            startDate: dateStr,
-                            startTime: timeStr
-                        })
-                    });
-                }
-                showStage('stage-success');
+                const data = await res.json();
+                output.textContent = JSON.stringify(data, null, 2);
             } catch (e) {
-                alert("Check-in failed: " + e.message);
-            } finally {
-                setLoading(false);
+                output.textContent = "Error: " + e.message;
             }
-        }
-
-        function showStage(id) {
-            document.querySelectorAll('.stage').forEach(s => s.classList.remove('active-stage'));
-            document.getElementById(id).classList.add('active-stage');
-        }
-
-        function setLoading(isLoading, text = 'Loading...') {
-            const loader = document.getElementById('loader');
-            document.getElementById('loader-text').textContent = text;
-            loader.classList.toggle('hidden', !isLoading);
         }
     </script>
 </body>
