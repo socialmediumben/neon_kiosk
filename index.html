@@ -2,54 +2,47 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon CRM Simple Test</title>
+    <title>Neon Ultimate Test</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+<body class="bg-slate-100 flex items-center justify-center min-h-screen p-4">
 
-    <div id="main-container" class="w-full max-w-xl bg-white p-8 rounded-2xl shadow-lg text-center">
-        <h1 class="text-3xl font-bold text-gray-800 mb-6">Neon Connection Test</h1>
+    <div class="w-full max-w-lg bg-white p-8 rounded-2xl shadow-xl">
+        <h1 class="text-2xl font-bold text-center mb-6">Neon CRM Debugger</h1>
         
-        <div id="status-box" class="p-6 border-2 border-dashed rounded-xl bg-gray-50 text-left">
-            <p class="text-sm font-bold text-gray-500 uppercase mb-4">API Response Status:</p>
-            <div id="api-output" class="font-mono text-sm break-all">Initializing...</div>
+        <div class="space-y-4">
+            <button onclick="testEndpoint('/v2/users')" class="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold">
+                Test 1: Fetch System Users
+            </button>
+            
+            <button onclick="testEndpoint('/v2/accounts?pageSize=1')" class="w-full py-3 bg-blue-600 text-white rounded-lg font-bold">
+                Test 2: Fetch Any Account
+            </button>
         </div>
 
-        <button onclick="fetchAccountList()" class="mt-8 w-full py-4 bg-blue-600 text-white rounded-xl text-xl font-bold">
-            Fetch Account List (GET)
-        </button>
+        <div class="mt-8 p-4 bg-black rounded-lg">
+            <p class="text-green-400 font-mono text-xs uppercase mb-2">Console Output:</p>
+            <pre id="console" class="text-white font-mono text-sm overflow-auto max-h-64">Waiting for input...</pre>
+        </div>
     </div>
 
     <script>
-        const API_PROXY_URL = window.location.origin;
-
-        // Auto-run on load to see if we can get anything
-        window.onload = fetchAccountList;
-
-        async function fetchAccountList() {
-            const output = document.getElementById('api-output');
-            output.innerHTML = "Requesting /v2/accounts...";
-
+        async function testEndpoint(path) {
+            const output = document.getElementById('console');
+            output.textContent = `Calling ${path}...`;
+            
             try {
-                // Using the simpler GET endpoint you discovered
-                const res = await fetch(`${API_PROXY_URL}/api/v2/accounts?pageSize=5&userType=INDIVIDUAL`);
+                const res = await fetch(`${window.location.origin}/api${path}`);
                 const data = await res.json();
-
-                if (res.ok && data.accounts && data.accounts.length > 0) {
-                    let html = `<p class="text-green-600 font-bold mb-2">✅ Success! Found ${data.pagination.totalResults} accounts.</p><ul class="list-disc ml-5">`;
-                    data.accounts.forEach(acc => {
-                        html += `<li>${acc.firstName} ${acc.lastName} (ID: ${acc.accountId})</li>`;
-                    });
-                    html += `</ul>`;
-                    output.innerHTML = html;
-                } else if (res.status === 401 || res.status === 403) {
-                    output.innerHTML = `<span class="text-red-600 font-bold">❌ Permission Denied (${res.status}).</span><br>Your API Key is valid, but doesn't have permission to list accounts.`;
-                } else {
-                    output.innerHTML = `<span class="text-orange-600 font-bold">⚠️ Connected, but empty.</span><br>Neon returned 0 results. Check if there are active 'Individual' accounts in your CRM.`;
+                
+                // Pretty-print the actual JSON response
+                output.textContent = JSON.stringify(data, null, 2);
+                
+                if (res.status === 200 && (!data.accounts || data.accounts.length === 0) && (!data.users || data.users.length === 0)) {
+                    output.textContent += "\n\n⚠️ NOTE: Request successful, but list is empty.";
                 }
             } catch (e) {
-                output.innerHTML = `<span class="text-red-500 font-bold">❌ Connection Failed:</span> ${e.message}`;
+                output.textContent = "Error: " + e.message;
             }
         }
     </script>
