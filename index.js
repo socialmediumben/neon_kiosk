@@ -19,7 +19,11 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// BULK SEARCH: Now uses a "Greater Than 0" filter to force a result
+/**
+ * BULK SEARCH ROUTE
+ * This uses the 'First Name NOT_BLANK' strategy to pull every individual 
+ * account while explicitly requesting the Phone1 field for your lookup table.
+ */
 app.get('/discovery/bulk-accounts', async (req, res) => {
     const page = req.query.page || 0;
     try {
@@ -31,48 +35,61 @@ app.get('/discovery/bulk-accounts', async (req, res) => {
             },
             body: JSON.stringify({
                 searchFields: [{
-                    field: "Account ID",
-                    operator: "GREATER_THAN",
-                    value: "0"
+                    field: "First Name",
+                    operator: "NOT_BLANK",
+                    value: "" 
                 }],
                 outputFields: ["First Name", "Last Name", "Account ID", "Phone1", "Email"],
                 pagination: {
                     currentPage: parseInt(page),
                     pageSize: 200,
-                    sortColumn: "Account ID",
+                    sortColumn: "First Name",
                     sortDirection: "ASC"
                 }
             })
         });
+        
         const data = await response.json();
         
         if (!response.ok) {
-            console.error("Neon API Error:", data);
+            console.error("Neon API Error Details:", data);
         }
         
         res.json(data);
     } catch (err) {
+        console.error("Server Error:", err.message);
         res.status(500).json({ error: err.message });
     }
 });
 
+/**
+ * GENERAL PROXY ROUTE
+ * Handles real-time requests for individual account profiles and activity creation.
+ */
 app.all('/api/*', async (req, res) => {
     try {
         const neonPath = req.path.replace('/api', '');
         const url = `https://api.neoncrm.com${neonPath}${req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''}`;
+        
         const fetchOptions = {
             method: req.method,
-            headers: { 'Authorization': `Basic ${getNeonAuth()}`, 'Content-Type': 'application/json' }
+            headers: { 
+                'Authorization': `Basic ${getNeonAuth()}`, 
+                'Content-Type': 'application/json' 
+            }
         };
+
         if (['POST', 'PATCH', 'PUT'].includes(req.method)) {
             fetchOptions.body = JSON.stringify(req.body);
         }
+
         const response = await fetch(url, fetchOptions);
         const data = await response.json();
         res.status(response.status).json(data);
     } catch (error) {
+        console.error("Proxy Error:", error.message);
         res.status(500).json({ error: 'Neon API Connection Failed' });
     }
 });
 
-app.listen(port, () => console.log(`Neon Proxy active on port ${port}`));
+app.listen(port, () => console.log(`Neon Kiosk Proxy active on port ${port}`));
