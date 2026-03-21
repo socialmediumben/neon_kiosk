@@ -19,23 +19,30 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// BULK FETCH: Pulls the first 200 accounts to build the lookup table
+app.get('/discovery/bulk-accounts', async (req, res) => {
+    try {
+        const response = await fetch('https://api.neoncrm.com/v2/accounts?pageSize=200&userType=INDIVIDUAL', {
+            headers: { 'Authorization': `Basic ${getNeonAuth()}` }
+        });
+        const data = await response.json();
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.all('/api/*', async (req, res) => {
     try {
         const neonPath = req.path.replace('/api', '');
         const url = `https://api.neoncrm.com${neonPath}${req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''}`;
-        
         const fetchOptions = {
             method: req.method,
-            headers: {
-                'Authorization': `Basic ${getNeonAuth()}`,
-                'Content-Type': 'application/json'
-            }
+            headers: { 'Authorization': `Basic ${getNeonAuth()}`, 'Content-Type': 'application/json' }
         };
-
         if (['POST', 'PATCH', 'PUT'].includes(req.method)) {
             fetchOptions.body = JSON.stringify(req.body);
         }
-
         const response = await fetch(url, fetchOptions);
         const data = await response.json();
         res.status(response.status).json(data);
@@ -44,4 +51,4 @@ app.all('/api/*', async (req, res) => {
     }
 });
 
-app.listen(port, () => console.log(`Neon Kiosk Proxy running on port ${port}`));
+app.listen(port, () => console.log(`Neon Proxy active on port ${port}`));
