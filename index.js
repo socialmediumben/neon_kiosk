@@ -19,34 +19,11 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// MASTER DISCOVERY: Visit https://neon-kiosk.onrender.com/discovery
-// This pulls every possible field definition from Neon v2
-app.get('/discovery', async (req, res) => {
-    const endpoints = [
-        'customFields?category=Individual',
-        'customFields?category=Account',
-        'customFields?category=Common',
-        'accounts/search/outputFields'
-    ];
-    const results = {};
-    
-    try {
-        for (const endpoint of endpoints) {
-            const response = await fetch(`https://api.neoncrm.com/v2/${endpoint}`, {
-                headers: { 'Authorization': `Basic ${getNeonAuth()}` }
-            });
-            results[endpoint] = await response.json();
-        }
-        res.json(results);
-    } catch (err) {
-        res.status(500).json({ error: "Discovery failed: " + err.message });
-    }
-});
-
+// Proxy all requests to Neon API v2
 app.all('/api/*', async (req, res) => {
     try {
         const neonPath = req.path.replace('/api', '');
-        const url = `https://api.neoncrm.com${neonPath}${req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''}`;
+        const url = `https://api.neoncrm.com${neonPath}`;
         
         const fetchOptions = {
             method: req.method,
@@ -64,6 +41,7 @@ app.all('/api/*', async (req, res) => {
         const data = await response.json();
         res.status(response.status).json(data);
     } catch (error) {
+        console.error("Proxy Error:", error);
         res.status(500).json({ error: 'Neon API Connection Failed' });
     }
 });
