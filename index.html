@@ -96,20 +96,21 @@
         async function confirmCheckIn() {
             setLoading(true, "Checking you in...");
             const now = new Date();
-            
-            // Neon CRM often requires a full ISO timestamp for activityDates.startDate
-            const fullIsoDate = now.toISOString(); 
+            const dateStr = now.toISOString(); 
 
+            // Payload adjusted for timeZone and priority requirements
             const payload = {
                 "subject": "Check-In",
                 "activityDates": {
-                    "startDate": fullIsoDate
+                    "startDate": dateStr,
+                    "timeZone": {
+                        "id": "1" // Standard ID for UTC or your primary Neon timezone
+                    }
                 },
                 "clientAccount": [{ "accountId": String(currentAccount.accountId) }],
                 "systemUserId": [String(SYSTEM_USER_ID)],
-                "status": { "id": "1" },      // Using ID instead of Name for "Completed"
-                "category": { "id": "1" },    // Many Neon instances require a Category ID
-                "priority": "Medium"
+                "status": { "id": "1" },
+                "priority": "Medium" // Required field set to valid string
             };
 
             console.log("[DEBUG] Payload:", JSON.stringify(payload));
