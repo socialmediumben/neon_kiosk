@@ -19,7 +19,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// BULK SEARCH: Now uses POST to request Phone1 specifically
+// BULK SEARCH: Now uses a "Greater Than 0" filter to force a result
 app.get('/discovery/bulk-accounts', async (req, res) => {
     const page = req.query.page || 0;
     try {
@@ -30,17 +30,26 @@ app.get('/discovery/bulk-accounts', async (req, res) => {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                searchFields: [], // Empty means "get everyone"
+                searchFields: [{
+                    field: "Account ID",
+                    operator: "GREATER_THAN",
+                    value: "0"
+                }],
                 outputFields: ["First Name", "Last Name", "Account ID", "Phone1", "Email"],
                 pagination: {
                     currentPage: parseInt(page),
                     pageSize: 200,
-                    sortColumn: "Last Name",
+                    sortColumn: "Account ID",
                     sortDirection: "ASC"
                 }
             })
         });
         const data = await response.json();
+        
+        if (!response.ok) {
+            console.error("Neon API Error:", data);
+        }
+        
         res.json(data);
     } catch (err) {
         res.status(500).json({ error: err.message });
