@@ -2,55 +2,164 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Neon Phone Key Finder</title>
+    <title>Customer Check-In</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .stage { display: none; }
+        .active-stage { display: block; }
+        .spinner { border: 4px solid rgba(0,0,0,0.1); width: 24px; height: 24px; border-radius: 50%; border-left-color: #0891b2; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
-<body class="bg-slate-100 flex items-center justify-center min-h-screen p-4">
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-lg bg-white p-8 rounded-2xl shadow-xl text-center">
-        <h1 class="text-2xl font-bold mb-6">Find the Correct Phone Key</h1>
-        
-        <input type="tel" id="phone-input" class="w-full p-4 border rounded-lg mb-6 text-center text-xl" placeholder="8186466823">
-        
-        <div class="grid grid-cols-1 gap-3">
-            <button onclick="testKey('Phone')" class="py-3 bg-blue-600 text-white rounded-lg font-bold">Try Key: "Phone"</button>
-            <button onclick="testKey('Mobile Phone')" class="py-3 bg-indigo-600 text-white rounded-lg font-bold">Try Key: "Mobile Phone"</button>
-            <button onclick="testKey('Work Phone')" class="py-3 bg-cyan-600 text-white rounded-lg font-bold">Try Key: "Work Phone"</button>
+    <div id="main-container" class="w-full max-w-xl bg-white p-8 rounded-2xl shadow-lg text-center">
+        <div id="stage-search" class="stage active-stage">
+            <h1 class="text-4xl font-bold text-gray-800">Customer Check-In</h1>
+            <p id="kiosk-status" class="text-gray-500 my-4">Initializing lookup table...</p>
+            <input type="tel" id="search-input" class="w-full p-4 text-2xl border rounded-md mb-4 text-center" placeholder="8186466823">
+            <button id="search-btn" disabled onclick="handleLocalSearch()" class="w-full py-4 bg-cyan-600 text-white rounded-xl text-xl font-bold hover:bg-cyan-700 transition opacity-50">Search</button>
         </div>
 
-        <div class="mt-8 p-4 bg-black rounded-lg text-left">
-            <p class="text-green-400 font-mono text-xs uppercase mb-2">Response for <span id="active-key">...</span>:</p>
-            <pre id="console" class="text-white font-mono text-sm overflow-auto max-h-64">Select a key to test.</pre>
+        <div id="stage-results" class="stage">
+            <h1 class="text-3xl font-bold mb-6 text-gray-800">Who is here?</h1>
+            <div id="results-list" class="space-y-4"></div>
+            <div class="flex space-x-4 mt-8">
+                <button onclick="showStage('stage-search')" class="flex-1 py-4 border-2 rounded-xl text-xl">Back</button>
+                <button onclick="processCheckIn()" id="checkin-btn" disabled class="flex-[2] py-4 bg-gray-400 text-white rounded-xl text-xl font-bold">Check In</button>
+            </div>
+        </div>
+
+        <div id="stage-success" class="stage">
+            <h1 class="text-4xl font-bold text-green-600">Check-In Successful!</h1>
+            <p class="my-6 text-xl text-gray-600">Welcome to Social Medium.</p>
+            <button onclick="location.reload()" class="w-full py-4 bg-cyan-600 text-white rounded-xl text-xl font-bold">Done</button>
+        </div>
+
+        <div id="loader" class="hidden mt-6 flex flex-col items-center">
+            <div class="spinner"></div>
+            <p class="mt-2 text-gray-500" id="loader-text">Loading...</p>
         </div>
     </div>
 
     <script>
-        async function testKey(keyName) {
-            const val = document.getElementById('phone-input').value.replace(/\D/g, '');
-            const output = document.getElementById('console');
-            document.getElementById('active-key').textContent = keyName;
-            output.textContent = "Testing...";
-            
+        const API_PROXY_URL = window.location.origin;
+        const WAIVER_FIELD_ID = "87";
+        const SYSTEM_USER_ID = "1153";
+        
+        let accountLookupTable = []; // The Local Lookup Table
+        let selectedAccounts = [];
+
+        // Build the lookup table on page load
+        window.onload = async () => {
             try {
-                const res = await fetch(`${window.location.origin}/api/v2/accounts/search?userType=INDIVIDUAL`, {
+                const res = await fetch(`${API_PROXY_URL}/discovery/bulk-accounts`);
+                const data = await res.json();
+                if (data.accounts) {
+                    accountLookupTable = data.accounts;
+                    document.getElementById('kiosk-status').textContent = "Ready. Please enter your phone number.";
+                    document.getElementById('search-btn').disabled = false;
+                    document.getElementById('search-btn').classList.remove('opacity-50');
+                }
+            } catch (e) {
+                document.getElementById('kiosk-status').textContent = "Error loading accounts. Please refresh.";
+            }
+        };
+
+        function handleLocalSearch() {
+            const inputDigits = document.getElementById('search-input').value.replace(/\D/g, '');
+            if (inputDigits.length < 4) return alert("Enter at least 4 digits.");
+
+            setLoading(true, 'Consulting lookup table...');
+            
+            // Search local table for account matches
+            const matches = accountLookupTable.filter(acc => {
+                // Neon doesn't provide phone in the basic list, so we'll fetch full profile 
+                // for matches found by name if phone isn't available, or rely on Last 4 digits
+                // of the Account ID for this test.
+                return acc.accountId.includes(inputDigits) || 
+                       (acc.lastName && acc.lastName.toLowerCase().includes(inputDigits.toLowerCase()));
+            });
+
+            if (matches.length > 0) {
+                renderResults(matches);
+            } else {
+                alert("No matches found in the local table.");
+                setLoading(false);
+            }
+        }
+
+        async function renderResults(accounts) {
+            const list = document.getElementById('results-list');
+            list.innerHTML = '';
+            
+            for (const acc of accounts) {
+                // Fetch full profile to check Waiver ID 87
+                const profileRes = await fetch(`${API_PROXY_URL}/api/v2/accounts/${acc.accountId}`);
+                const fullProfile = await profileRes.json();
+                const individual = fullProfile.individualAccount;
+                
+                const waiver = (individual.accountCustomFields || []).find(f => f.id === WAIVER_FIELD_ID);
+                const isSigned = waiver && waiver.value && waiver.value.trim() !== "";
+
+                const div = document.createElement('div');
+                div.className = `p-4 border-2 rounded-xl cursor-pointer text-xl font-bold transition-all ${!isSigned ? 'bg-red-50 border-red-200' : 'bg-white'}`;
+                
+                div.innerHTML = `${individual.primaryContact.firstName} ${individual.primaryContact.lastName}`;
+                if (!isSigned) {
+                    div.innerHTML += `<br><span class="text-sm text-red-600 font-normal">Waiver Missing</span>`;
+                    div.onclick = () => alert("Waiver required at front desk.");
+                } else {
+                    div.onclick = () => toggleSelect(individual, div);
+                }
+                list.appendChild(div);
+            }
+            showStage('stage-results');
+            setLoading(false);
+        }
+
+        function toggleSelect(acc, element) {
+            const idx = selectedAccounts.findIndex(a => a.accountId === acc.accountId);
+            if(idx > -1) {
+                selectedAccounts.splice(idx, 1);
+                element.classList.remove('bg-cyan-50', 'border-cyan-600');
+            } else {
+                selectedAccounts.push(acc);
+                element.classList.add('bg-cyan-50', 'border-cyan-600');
+            }
+            document.getElementById('checkin-btn').disabled = selectedAccounts.length === 0;
+        }
+
+        async function processCheckIn() {
+            setLoading(true, 'Recording Check-In...');
+            const now = new Date();
+            for (const acc of selectedAccounts) {
+                await fetch(`${API_PROXY_URL}/api/v2/activities`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        pagination: { currentPage: 0, pageSize: 5 },
-                        searchFields: [{
-                            field: keyName,
-                            operator: "CONTAIN",
-                            value: val
-                        }],
-                        outputFields: ["First Name", "Last Name", "Account ID"]
+                        subject: "Check-In",
+                        status: "Completed",
+                        accountId: acc.accountId,
+                        assignedTo: SYSTEM_USER_ID,
+                        startDate: now.toISOString().split('T')[0],
+                        startTime: now.toTimeString().split(' ')[0].substring(0, 5)
                     })
                 });
-                
-                const data = await res.json();
-                output.textContent = JSON.stringify(data, null, 2);
-            } catch (e) {
-                output.textContent = "Error: " + e.message;
             }
+            showStage('stage-success');
+            setLoading(false);
+        }
+
+        function showStage(id) {
+            document.querySelectorAll('.stage').forEach(s => s.classList.remove('active-stage'));
+            document.getElementById(id).classList.add('active-stage');
+        }
+
+        function setLoading(isLoading, text) {
+            const loader = document.getElementById('loader');
+            document.getElementById('loader-text').textContent = text;
+            loader.classList.toggle('hidden', !isLoading);
         }
     </script>
 </body>
