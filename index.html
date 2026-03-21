@@ -34,15 +34,6 @@
             <button onclick="showStage('stage-search')" class="text-gray-400 font-semibold hover:underline">Back to Search</button>
         </div>
 
-        <div id="stage-waiver" class="stage">
-            <h1 class="text-3xl font-bold text-gray-800 mb-4">Sign Waiver</h1>
-            <div id="qrcode-direct" class="qrcode-container mb-6 flex justify-center bg-white p-4 rounded-lg inline-block mx-auto border border-gray-100"></div>
-            <div class="mb-8">
-                <a href="https://socialmedium.app.neoncrm.com/forms/waiver" target="_blank" class="text-cyan-600 font-bold text-lg underline break-all">socialmedium.app.neoncrm.com/forms/waiver</a>
-            </div>
-            <button onclick="showStage('stage-search')" class="w-full py-4 bg-gray-200 text-gray-700 rounded-2xl text-xl font-bold">Back</button>
-        </div>
-
         <div id="stage-confirm" class="stage">
             <div id="account-info" class="mb-8"></div>
             <div id="action-area"></div>
@@ -58,7 +49,7 @@
 
         <div id="loader" class="hidden mt-6 flex flex-col items-center">
             <div class="spinner"></div>
-            <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
+            <p class="mt-2 text-gray-500" id="loader-text">Searching...</p>
         </div>
     </div>
 
@@ -80,7 +71,7 @@
                     await searchAccountsByName(input);
                 }
             } catch (e) {
-                alert("Error: " + e.message);
+                alert("Search Error: " + e.message);
             } finally {
                 setLoading(false);
             }
@@ -89,9 +80,7 @@
         async function fetchAccountById(id) {
             const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/${id}`);
             const data = await res.json();
-            
-            console.log("Neon API Response: GET ACCOUNT", data); // EXPLICIT LOG
-            
+            console.log("Neon API Response: GET ACCOUNT", data);
             if (!res.ok || !data.individualAccount) throw new Error("Account not found.");
             currentAccount = data.individualAccount;
             renderConfirmation();
@@ -99,7 +88,11 @@
 
         async function searchAccountsByName(lastName) {
             const payload = {
-                "searchFields": [{ "field": "Last Name", "operator": "EQUAL", "value": lastName }],
+                "searchFields": [{
+                    "field": "Last Name", // This is the standard Neon display name for the field
+                    "operator": "EQUAL",
+                    "value": lastName
+                }],
                 "outputFields": ["First Name", "Last Name", "Account ID"],
                 "pagination": { "currentPage": 0, "pageSize": 50 }
             };
@@ -111,19 +104,21 @@
             });
 
             const data = await response.json();
-            
-            console.log("Neon API Response: SEARCH", data); // EXPLICIT LOG
+            console.log("Neon API Response: SEARCH", data);
 
             if (!response.ok) {
-                const errorInfo = Array.isArray(data) ? data[0] : data;
-                throw new Error(errorInfo.message || "Search failed");
+                // If it's a 400 error, Neon usually sends an 'errors' array
+                const errorDetail = data.errors ? data.errors[0].message : "Check console for details.";
+                throw new Error(`Neon Error: ${errorDetail}`);
             }
 
             const accounts = data.searchResults || [];
-            if (accounts.length === 0) throw new Error("No accounts found.");
+            if (accounts.length === 0) throw new Error("No accounts found with that name.");
             
             if (accounts.length === 1) {
-                await fetchAccountById(accounts[0]["Account ID"] || accounts[0].accountId);
+                // Map the search result key back to the account ID
+                const id = accounts[0]["Account ID"] || accounts[0].accountId;
+                await fetchAccountById(id);
             } else {
                 renderResultsList(accounts);
             }
@@ -137,8 +132,8 @@
                 const fname = acc["First Name"] || acc.firstName || "";
                 const lname = acc["Last Name"] || acc.lastName || "";
                 const btn = document.createElement('button');
-                btn.className = "w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-left hover:bg-cyan-50 mb-2";
-                btn.innerHTML = `<strong>${fname} ${lname}</strong><br><small>ID: ${id}</small>`;
+                btn.className = "w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-left hover:bg-cyan-50 mb-2 transition-all";
+                btn.innerHTML = `<strong>${fname} ${lname}</strong><br><small class="text-gray-400">ID: ${id}</small>`;
                 btn.onclick = () => fetchAccountById(id);
                 list.appendChild(btn);
             });
@@ -186,10 +181,6 @@
 
             try {
                 const response = await fetch(`${API_PROXY_URL}/api/v2/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                const result = await response.json();
-                
-                console.log("Neon API Response: CHECK-IN", result); // EXPLICIT LOG
-
                 if (!response.ok) throw new Error("Check-in failed");
                 document.getElementById('success-msg').textContent = `${currentAccount.primaryContact.firstName} checked in!`;
                 showStage('stage-success');
