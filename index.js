@@ -19,11 +19,10 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Proxy all requests to Neon API v2
 app.all('/api/*', async (req, res) => {
     try {
         const neonPath = req.path.replace('/api', '');
-        const url = `https://api.neoncrm.com${neonPath}`;
+        const url = `https://api.neoncrm.com${neonPath}${req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''}`;
         
         const fetchOptions = {
             method: req.method,
@@ -41,9 +40,8 @@ app.all('/api/*', async (req, res) => {
         const data = await response.json();
         res.status(response.status).json(data);
     } catch (error) {
-        console.error("Proxy Error:", error);
         res.status(500).json({ error: 'Neon API Connection Failed' });
     }
 });
 
-app.listen(port, () => console.log(`Neon Proxy active on port ${port}`));
+app.listen(port, () => console.log(`Neon Kiosk Proxy running on port ${port}`));
