@@ -2,39 +2,57 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Neon CRM Bulk Sync - Phone Version</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Medium Check-In Kiosk</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .stage { display: none; }
+        .active-stage { display: block; }
+        .spinner { border: 4px solid rgba(0,0,0,0.1); width: 32px; height: 32px; border-radius: 50%; border-left-color: #0891b2; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
-<body class="bg-slate-100 p-8">
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
 
-    <div class="max-w-5xl mx-auto space-y-6">
-        <div class="bg-white p-8 rounded-2xl shadow-lg text-center">
-            <h1 class="text-3xl font-bold mb-2">Neon CRM Sync</h1>
-            <p id="sync-status" class="text-blue-600 font-semibold mb-6">Initializing sync...</p>
-            
-            <div class="flex flex-col sm:flex-row justify-center gap-4">
-                <button id="view-table-btn" disabled onclick="toggleTable()" class="px-6 py-3 bg-slate-800 text-white rounded-lg font-bold opacity-50">
-                    View Lookup Table
-                </button>
-                <button onclick="location.reload()" class="px-6 py-3 border-2 border-slate-800 rounded-lg font-bold">
-                    Restart Sync
-                </button>
+    <div id="main-container" class="w-full max-w-2xl bg-white p-8 rounded-3xl shadow-2xl text-center">
+        
+        <div id="stage-sync" class="stage active-stage">
+            <h1 class="text-3xl font-bold text-gray-800 mb-4">Initializing Kiosk</h1>
+            <div class="flex justify-center my-8">
+                <div class="spinner"></div>
+            </div>
+            <p id="sync-status" class="text-blue-600 font-medium">Connecting to Neon CRM...</p>
+        </div>
+
+        <div id="stage-search" class="stage">
+            <h1 class="text-4xl font-extrabold text-gray-800 mb-2">Check-In</h1>
+            <p class="text-gray-500 mb-8 text-lg">Enter your phone number to begin.</p>
+            <input type="tel" id="search-input" class="w-full p-5 text-4xl border-2 border-gray-200 rounded-2xl mb-6 text-center tracking-widest focus:border-cyan-500 outline-none transition-all" placeholder="8186466823">
+            <button onclick="handleSearch()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold hover:bg-cyan-700 active:scale-95 transition-all shadow-lg">Find My Account</button>
+            <button onclick="toggleDebug()" class="mt-8 text-xs text-gray-300 uppercase tracking-widest hover:text-gray-500">View Lookup Table</button>
+        </div>
+
+        <div id="stage-results" class="stage">
+            <h1 class="text-3xl font-bold mb-8 text-gray-800">Select Your Name</h1>
+            <div id="results-list" class="space-y-4 max-h-[400px] overflow-y-auto p-2"></div>
+            <div class="flex space-x-4 mt-8">
+                <button onclick="showStage('stage-search')" class="flex-1 py-4 border-2 border-gray-200 rounded-2xl text-xl font-semibold text-gray-600">Back</button>
+                <button onclick="processCheckIn()" id="checkin-btn" disabled class="flex-[2] py-4 bg-gray-400 text-white rounded-2xl text-xl font-bold shadow-lg">Confirm Check-In</button>
             </div>
         </div>
 
-        <div id="table-container" class="hidden bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
-            <h2 class="text-xl font-bold mb-4">Internal Lookup Table (<span id="count-display">0</span> records)</h2>
-            <div class="overflow-x-auto max-h-[600px] overflow-y-auto border rounded">
-                <table class="w-full text-left text-sm">
-                    <thead class="bg-slate-50 sticky top-0">
-                        <tr>
-                            <th class="p-3 border-b">ID</th>
-                            <th class="p-3 border-b">Name</th>
-                            <th class="p-3 border-b">Phone</th>
-                            <th class="p-3 border-b">Email</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table-body" class="divide-y"></tbody>
+        <div id="stage-success" class="stage">
+            <div class="text-6xl mb-6">✅</div>
+            <h1 class="text-4xl font-bold text-green-600 mb-4">You're All Set!</h1>
+            <p class="text-xl text-gray-600 mb-8">Have a great time at Social Medium.</p>
+            <button onclick="location.reload()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold">Done</button>
+        </div>
+
+        <div id="debug-table" class="hidden mt-10 text-left border-t pt-6">
+            <h2 class="font-bold text-gray-400 mb-2 uppercase text-xs">Internal Lookup Table</h2>
+            <div class="max-h-40 overflow-y-auto text-[10px] font-mono bg-gray-50 p-2 rounded border">
+                <table class="w-full">
+                    <tbody id="debug-body"></tbody>
                 </table>
             </div>
         </div>
@@ -42,8 +60,13 @@
 
     <script>
         const API_PROXY_URL = window.location.origin;
-        let accountLookupTable = [];
+        const WAIVER_FIELD_ID = "87";
+        const SYSTEM_USER_ID = "1153";
+        
+        let accountLookupTable = []; 
+        let selectedAccounts = [];
 
+        // 1. SYNC ALL ACCOUNTS ON LOAD
         window.onload = async () => {
             let currentPage = 0;
             let totalPages = 1;
@@ -51,52 +74,140 @@
 
             try {
                 while (currentPage < totalPages) {
-                    statusEl.textContent = `Syncing Batch ${currentPage + 1}...`;
+                    statusEl.textContent = `Syncing Database... Batch ${currentPage + 1}`;
                     
                     const res = await fetch(`${API_PROXY_URL}/discovery/bulk-accounts?page=${currentPage}`);
                     const data = await res.json();
 
-                    // Search results are returned in 'searchResults' for the POST search endpoint
                     if (data.searchResults) {
                         accountLookupTable = accountLookupTable.concat(data.searchResults);
                         totalPages = data.pagination.totalPages;
                         currentPage++;
                     } else {
-                        throw new Error("No search results found");
+                        throw new Error("Sync failed to retrieve data.");
                     }
                 }
-
-                statusEl.textContent = `✅ Sync Complete: ${accountLookupTable.length} accounts loaded with Phone Numbers.`;
-                statusEl.className = "text-green-600 font-bold mb-6";
-                
-                const btn = document.getElementById('view-table-btn');
-                btn.disabled = false;
-                btn.classList.remove('opacity-50', 'bg-slate-800');
-                btn.classList.add('bg-indigo-600');
-                
-                populateTable();
+                showStage('stage-search');
+                populateDebug();
             } catch (e) {
-                statusEl.textContent = "❌ Sync failed: " + e.message;
-                statusEl.className = "text-red-600 font-bold mb-6";
+                statusEl.textContent = "Sync Error. Please check connection and refresh.";
+                statusEl.className = "text-red-600 font-bold";
             }
         };
 
-        function populateTable() {
-            const body = document.getElementById('table-body');
-            document.getElementById('count-display').textContent = accountLookupTable.length;
-            
-            body.innerHTML = accountLookupTable.map(acc => `
-                <tr>
-                    <td class="p-3 font-mono text-xs text-slate-400">${acc["Account ID"]}</td>
-                    <td class="p-3 font-bold">${acc["First Name"]} ${acc["Last Name"]}</td>
-                    <td class="p-3 text-blue-600 font-mono">${acc["Phone1"] || '—'}</td>
-                    <td class="p-3 text-slate-500">${acc["Email"] || '—'}</td>
-                </tr>
-            `).join('');
+        // 2. LOCAL SEARCH (Instant)
+        function handleSearch() {
+            const input = document.getElementById('search-input').value.replace(/\D/g, '');
+            if (input.length < 4) return alert("Please enter at least 4 digits.");
+
+            // Search by cleaning stored phone numbers to match input digits
+            const matches = accountLookupTable.filter(acc => {
+                const storedPhone = (acc["Phone1"] || "").replace(/\D/g, '');
+                return storedPhone.includes(input) || acc["Account ID"] === input;
+            });
+
+            renderResults(matches);
         }
 
-        function toggleTable() {
-            document.getElementById('table-container').classList.toggle('hidden');
+        // 3. RENDER SEARCH RESULTS
+        async function renderResults(accounts) {
+            const list = document.getElementById('results-list');
+            list.innerHTML = '';
+            selectedAccounts = [];
+            document.getElementById('checkin-btn').disabled = true;
+            document.getElementById('checkin-btn').className = "flex-[2] py-4 bg-gray-400 text-white rounded-2xl text-xl font-bold shadow-lg";
+
+            if (accounts.length === 0) {
+                list.innerHTML = '<p class="text-gray-400 py-8">No accounts found. Please see staff for help!</p>';
+            }
+
+            for (const acc of accounts) {
+                const id = acc["Account ID"];
+                
+                // Fetch full profile to verify Waiver ID 87 status
+                const profileRes = await fetch(`${API_PROXY_URL}/api/v2/accounts/${id}`);
+                const fullData = await profileRes.json();
+                const individual = fullData.individualAccount;
+                
+                const waiver = (individual.accountCustomFields || []).find(f => f.id === WAIVER_FIELD_ID);
+                const isSigned = waiver && waiver.value && waiver.value.trim() !== "";
+
+                const card = document.createElement('div');
+                card.className = `p-6 border-2 rounded-2xl text-left transition-all ${!isSigned ? 'bg-red-50 border-red-100 opacity-60' : 'bg-white border-gray-100 cursor-pointer hover:border-cyan-500 hover:shadow-md'}`;
+                
+                card.innerHTML = `
+                    <div class="text-2xl font-bold text-gray-800">${acc["First Name"]} ${acc["Last Name"]}</div>
+                    <div class="text-sm ${isSigned ? 'text-cyan-600' : 'text-red-500'} font-medium">
+                        ${isSigned ? '✓ Waiver on file' : '⚠ Waiver missing - See staff'}
+                    </div>
+                `;
+
+                if (isSigned) {
+                    card.onclick = () => toggleSelect(acc, card);
+                } else {
+                    card.onclick = () => alert("Waiver required. Please ask a staff member to update your account.");
+                }
+                list.appendChild(card);
+            }
+            showStage('stage-results');
+        }
+
+        function toggleSelect(acc, element) {
+            const idx = selectedAccounts.findIndex(a => a["Account ID"] === acc["Account ID"]);
+            if(idx > -1) {
+                selectedAccounts.splice(idx, 1);
+                element.classList.remove('ring-4', 'ring-cyan-500', 'border-cyan-500');
+            } else {
+                selectedAccounts.push(acc);
+                element.classList.add('ring-4', 'ring-cyan-500', 'border-cyan-500');
+            }
+            const btn = document.getElementById('checkin-btn');
+            btn.disabled = selectedAccounts.length === 0;
+            btn.className = selectedAccounts.length === 0 
+                ? "flex-[2] py-4 bg-gray-400 text-white rounded-2xl text-xl font-bold" 
+                : "flex-[2] py-4 bg-cyan-600 text-white rounded-2xl text-xl font-bold shadow-lg";
+        }
+
+        // 4. PROCESS FINAL CHECK-IN
+        async function processCheckIn() {
+            const statusEl = document.getElementById('sync-status');
+            showStage('stage-sync');
+            statusEl.textContent = "Checking you in...";
+            
+            const now = new Date();
+            try {
+                for (const acc of selectedAccounts) {
+                    await fetch(`${API_PROXY_URL}/api/v2/activities`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            subject: "Check-In",
+                            status: "Completed",
+                            accountId: acc["Account ID"],
+                            assignedTo: SYSTEM_USER_ID,
+                            startDate: now.toISOString().split('T')[0],
+                            startTime: now.toTimeString().split(' ')[0].substring(0, 5)
+                        })
+                    });
+                }
+                showStage('stage-success');
+            } catch (e) {
+                alert("Check-in failed: " + e.message);
+                showStage('stage-results');
+            }
+        }
+
+        // UTILS
+        function showStage(id) {
+            document.querySelectorAll('.stage').forEach(s => s.classList.remove('active-stage'));
+            document.getElementById(id).classList.add('active-stage');
+        }
+
+        function toggleDebug() { document.getElementById('debug-table').classList.toggle('hidden'); }
+
+        function populateDebug() {
+            const body = document.getElementById('debug-body');
+            body.innerHTML = accountLookupTable.map(a => `<tr><td>${a["Account ID"]}</td><td>${a["First Name"]} ${a["Last Name"]}</td><td>${a["Phone1"] || '-'}</td></tr>`).join('');
         }
     </script>
 </body>
