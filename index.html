@@ -3,120 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon CRM Debug Kiosk</title>
+    <title>Neon CRM Simple Test</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .stage { display: none; }
-        .active-stage { display: block; }
-        .spinner { border: 4px solid rgba(0,0,0,0.1); width: 24px; height: 24px; border-radius: 50%; border-left-color: #0891b2; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
 
-    <div id="main-container" class="w-full max-w-2xl bg-white p-8 rounded-2xl shadow-lg text-center">
-        <div id="stage-search" class="stage active-stage">
-            <h1 class="text-4xl font-bold text-gray-800">Account Search</h1>
-            <p class="text-gray-500 my-4">Enter phone digits to test search.</p>
-            <input type="tel" id="search-input" class="w-full p-4 text-2xl border rounded-md mb-4 text-center" placeholder="5551234567">
-            <button onclick="searchAccounts()" class="w-full py-4 bg-blue-600 text-white rounded-xl text-xl hover:bg-blue-700 transition">Search Neon</button>
-            
-            <div id="example-box" class="mt-10 p-4 border-2 border-dashed border-blue-300 rounded-xl bg-blue-50 text-left">
-                <p class="text-xs font-bold text-blue-500 uppercase tracking-widest mb-2">Live Connection Test: Example Account</p>
-                <div id="example-content" class="text-sm text-gray-600 italic">Attempting to pull example account...</div>
-            </div>
+    <div id="main-container" class="w-full max-w-xl bg-white p-8 rounded-2xl shadow-lg text-center">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">Neon Connection Test</h1>
+        
+        <div id="status-box" class="p-6 border-2 border-dashed rounded-xl bg-gray-50 text-left">
+            <p class="text-sm font-bold text-gray-500 uppercase mb-4">API Response Status:</p>
+            <div id="api-output" class="font-mono text-sm break-all">Initializing...</div>
         </div>
 
-        <div id="stage-results" class="stage text-left">
-            <h1 class="text-2xl font-bold mb-6 text-center">Search Results</h1>
-            <div id="results-list" class="space-y-6"></div>
-            <button onclick="showStage('stage-search')" class="mt-8 w-full py-4 border-2 rounded-xl text-xl">New Search</button>
-        </div>
-
-        <div id="loader" class="hidden mt-6 flex flex-col items-center">
-            <div class="spinner"></div>
-            <p class="mt-2 text-gray-500">Communicating with Neon...</p>
-        </div>
+        <button onclick="fetchAccountList()" class="mt-8 w-full py-4 bg-blue-600 text-white rounded-xl text-xl font-bold">
+            Fetch Account List (GET)
+        </button>
     </div>
 
     <script>
         const API_PROXY_URL = window.location.origin;
 
-        // Automatically load an example account on startup
-        window.onload = fetchExampleAccount;
+        // Auto-run on load to see if we can get anything
+        window.onload = fetchAccountList;
 
-        async function fetchExampleAccount() {
-            const exampleDiv = document.getElementById('example-content');
+        async function fetchAccountList() {
+            const output = document.getElementById('api-output');
+            output.innerHTML = "Requesting /v2/accounts...";
+
             try {
-                // Performing a search with no criteria to get the first available account
-                const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/search`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        pagination: { pageSize: 1, currentPage: 0 },
-                        searchFields: [], // No criteria = pull any record
-                        outputFields: ["First Name", "Last Name", "Phone", "Account ID", "Account Custom Fields", "Common Custom Fields", "Individual Custom Fields"]
-                    })
-                });
+                // Using the simpler GET endpoint you discovered
+                const res = await fetch(`${API_PROXY_URL}/api/v2/accounts?pageSize=5&userType=INDIVIDUAL`);
                 const data = await res.json();
-                
-                if (data.searchResults && data.searchResults.length > 0) {
-                    const acc = data.searchResults[0];
-                    const allFields = [...(acc["Account Custom Fields"] || []), ...(acc["Common Custom Fields"] || []), ...(acc["Individual Custom Fields"] || [])];
-                    const fieldSummary = allFields.map(f => `${f.fieldName}: ${f.value}`).join(' | ');
-                    
-                    exampleDiv.innerHTML = `
-                        <div class="font-bold text-blue-900">${acc["First Name"]} ${acc["Last Name"]}</div>
-                        <div><strong>Phone in Neon:</strong> ${acc["Phone"] || 'None listed'}</div>
-                        <div><strong>Account ID:</strong> ${acc["Account ID"]}</div>
-                        <div class="mt-2 text-xs text-gray-500"><strong>Fields Found:</strong> ${fieldSummary || 'None'}</div>
-                    `;
+
+                if (res.ok && data.accounts && data.accounts.length > 0) {
+                    let html = `<p class="text-green-600 font-bold mb-2">✅ Success! Found ${data.pagination.totalResults} accounts.</p><ul class="list-disc ml-5">`;
+                    data.accounts.forEach(acc => {
+                        html += `<li>${acc.firstName} ${acc.lastName} (ID: ${acc.accountId})</li>`;
+                    });
+                    html += `</ul>`;
+                    output.innerHTML = html;
+                } else if (res.status === 401 || res.status === 403) {
+                    output.innerHTML = `<span class="text-red-600 font-bold">❌ Permission Denied (${res.status}).</span><br>Your API Key is valid, but doesn't have permission to list accounts.`;
                 } else {
-                    exampleDiv.textContent = "Connection successful, but no accounts were returned.";
+                    output.innerHTML = `<span class="text-orange-600 font-bold">⚠️ Connected, but empty.</span><br>Neon returned 0 results. Check if there are active 'Individual' accounts in your CRM.`;
                 }
             } catch (e) {
-                exampleDiv.innerHTML = `<span class="text-red-500 font-bold">Connection Failed:</span> ${e.message}`;
+                output.innerHTML = `<span class="text-red-500 font-bold">❌ Connection Failed:</span> ${e.message}`;
             }
-        }
-
-        async function searchAccounts() {
-            const phone = document.getElementById('search-input').value.replace(/\D/g, '');
-            if (phone.length < 4) return alert("Enter at least 4 digits.");
-
-            document.getElementById('loader').classList.remove('hidden');
-            try {
-                const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/search`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        searchFields: [{ field: "Phone", operator: "CONTAIN", value: phone }],
-                        outputFields: ["First Name", "Last Name", "Account ID", "Account Custom Fields", "Common Custom Fields", "Individual Custom Fields"]
-                    })
-                });
-                const data = await res.json();
-                renderResults(data.searchResults || []);
-            } catch (e) { alert("Error: " + e.message); }
-            finally { document.getElementById('loader').classList.add('hidden'); }
-        }
-
-        function renderResults(accounts) {
-            const list = document.getElementById('results-list');
-            list.innerHTML = '';
-            if (accounts.length === 0) {
-                list.innerHTML = '<p class="text-center text-red-500 font-bold">No accounts found.</p>';
-            }
-            accounts.forEach(acc => {
-                const div = document.createElement('div');
-                div.className = "p-4 border-2 rounded-xl bg-slate-50";
-                div.innerHTML = `<div class="text-xl font-bold">${acc["First Name"]} ${acc["Last Name"]}</div><div class="text-sm">ID: ${acc["Account ID"]}</div>`;
-                list.appendChild(div);
-            });
-            showStage('stage-results');
-        }
-
-        function showStage(id) {
-            document.querySelectorAll('.stage').forEach(s => s.classList.remove('active-stage'));
-            document.getElementById(id).classList.add('active-stage');
         }
     </script>
 </body>
