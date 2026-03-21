@@ -16,8 +16,9 @@
         /* Nametag Printing Styles */
         @media print {
             body * { visibility: hidden; }
-            #nametag-to-print, #nametag-to-print * { visibility: visible; }
+            #nametag-to-print, #nametag-to-print * { visibility: visible !important; }
             #nametag-to-print {
+                display: block !important;
                 position: absolute;
                 left: 0;
                 top: 0;
@@ -35,7 +36,13 @@
         <div id="stage-search" class="stage active-stage">
             <h1 class="text-4xl font-extrabold text-gray-800 mb-2">Check-In</h1>
             <p class="text-gray-500 mb-8">Enter your Account ID or Last Name.</p>
-            <input type="text" id="search-input" onkeydown="if(event.key==='Enter') handleSearch()" class="w-full p-5 text-3xl border-2 border-gray-100 rounded-2xl mb-6 text-center focus:border-cyan-500 outline-none transition-all" placeholder="ID or Last Name">
+            <input type="text" id="search-input" 
+                   autocomplete="off" 
+                   autocorrect="off" 
+                   spellcheck="false"
+                   onkeydown="if(event.key==='Enter') handleSearch()" 
+                   class="w-full p-5 text-3xl border-2 border-gray-100 rounded-2xl mb-6 text-center focus:border-cyan-500 outline-none transition-all" 
+                   placeholder="ID or Last Name">
             <button onclick="handleSearch()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold hover:bg-cyan-700 shadow-lg mb-6">Search</button>
             <div class="border-t border-gray-100 pt-6">
                 <button onclick="showWaiverOnly()" class="w-full py-4 bg-emerald-600 text-white rounded-2xl text-xl font-bold shadow-md">Sign the Waiver</button>
@@ -71,7 +78,7 @@
             <div id="nametag-preview" class="mb-6"></div>
 
             <button onclick="window.print()" class="w-full py-4 bg-blue-600 text-white rounded-2xl text-xl font-bold mb-4 hover:bg-blue-700 shadow-md">Print Nametag</button>
-            <button onclick="location.reload()" class="w-full py-4 bg-cyan-600 text-white rounded-2xl text-xl font-bold hover:bg-cyan-700">Next Person <span id="timer">(30)</span></button>
+            <button onclick="location.reload()" class="w-full py-4 bg-cyan-600 text-white rounded-2xl text-xl font-bold">Next Person <span id="timer">(30)</span></button>
         </div>
 
         <div id="loader" class="hidden mt-6 flex flex-col items-center">
@@ -80,7 +87,7 @@
         </div>
     </div>
 
-    <div id="nametag-to-print" class="hidden"></div>
+    <div id="nametag-to-print" class="p-8"></div>
 
     <script>
         const API_PROXY_URL = window.location.origin;
@@ -94,7 +101,7 @@
         async function handleSearch() {
             const input = document.getElementById('search-input').value.trim();
             if (!input) return alert("Please enter an ID or Last Name.");
-            console.log("[DEBUG] STEP 1: Starting Search for:", input);
+            console.log("[DEBUG] Starting Search:", input);
             setLoading(true, "Searching...");
             try {
                 if (/^\d+$/.test(input)) {
@@ -103,7 +110,6 @@
                     await searchAccountsByName(input);
                 }
             } catch (e) {
-                console.error("[DEBUG] Search Failed:", e.message);
                 alert("Error: " + e.message);
             } finally {
                 setLoading(false);
@@ -111,12 +117,10 @@
         }
 
         async function fetchAccountById(id) {
-            console.log("[DEBUG] STEP 2: Fetching Account ID:", id);
             const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/${id}`);
             const data = await res.json();
             if (!res.ok || !data.individualAccount) throw new Error("Account not found.");
             currentAccount = data.individualAccount;
-            console.log("[DEBUG] STEP 3: Account Data Loaded:", currentAccount.primaryContact.firstName);
             renderConfirmation();
         }
 
@@ -134,7 +138,6 @@
             const data = await response.json();
             if (!response.ok) throw new Error("Search failed");
             const accounts = data.searchResults || [];
-            console.log("[DEBUG] STEP 2b: Name search found count:", accounts.length);
             if (accounts.length === 0) throw new Error("No accounts found.");
             if (accounts.length === 1) {
                 await fetchAccountById(accounts[0]["Account ID"] || accounts[0].accountId);
@@ -158,10 +161,8 @@
         }
 
         function generateNametagHTML() {
-            console.log("[DEBUG] STEP 6: Formatting Nametag HTML");
             const contact = currentAccount.primaryContact;
             const fields = currentAccount.accountCustomFields || [];
-            
             const membership = currentAccount.accountCurrentMembershipStatus || "None";
             const pronouns = contact.gender ? contact.gender.name : "___________";
             const name = contact.preferredName || contact.firstName;
@@ -176,24 +177,23 @@
             const combinedInterests = [interests, customInterests].filter(i => i !== "").join(", ");
 
             return `
-                <div class="border-8 border-black rounded-3xl p-8 text-left bg-white max-w-2xl mx-auto shadow-sm">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="text-7xl font-black uppercase tracking-tighter">${name}</div>
-                        <div class="border-4 border-black rounded-full h-20 w-20 flex items-center justify-center text-center text-[10px] font-bold p-1 leading-none uppercase">
+                <div class="border-[12px] border-black rounded-[40px] p-12 text-left bg-white max-w-2xl mx-auto">
+                    <div class="flex justify-between items-start mb-6">
+                        <div class="text-8xl font-black uppercase tracking-tighter text-black">${name}</div>
+                        <div class="border-4 border-black rounded-full h-24 w-24 flex items-center justify-center text-center text-[11px] font-bold p-1 leading-none uppercase text-black">
                             ${membership}
                         </div>
                     </div>
-                    <div class="text-2xl font-bold mt-2">Pronouns: ${pronouns}</div>
-                    <div class="mt-8">
-                        <div class="text-3xl font-black italic uppercase text-gray-300">I'm Nerdy for...</div>
-                        <div class="text-2xl font-bold mt-1 leading-tight text-gray-800">${combinedInterests || "Everything!"}</div>
+                    <div class="text-3xl font-bold mt-2 text-black">Pronouns: ${pronouns}</div>
+                    <div class="mt-12">
+                        <div class="text-4xl font-black italic uppercase text-gray-300">I'm Nerdy for...</div>
+                        <div class="text-3xl font-bold mt-2 leading-tight text-black">${combinedInterests || "Everything!"}</div>
                     </div>
                 </div>
             `;
         }
 
         function renderConfirmation() {
-            console.log("[DEBUG] STEP 4: Rendering Confirmation Stage");
             const info = document.getElementById('account-info');
             const actions = document.getElementById('action-area');
             const contact = currentAccount.primaryContact;
@@ -214,7 +214,7 @@
         }
 
         async function confirmCheckIn() {
-            console.log("[DEBUG] STEP 5: Submitting Check-in Activity");
+            console.log("[DEBUG] Confirming Check-in...");
             setLoading(true, "Checking in...");
             const now = new Date();
             const options = { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' };
@@ -237,16 +237,14 @@
                 
                 document.getElementById('success-msg').textContent = `${currentAccount.primaryContact.firstName} checked in!`;
                 
-                // GENERATE NAMETAG
+                // Printing Fix: Ensure HTML is injected before print is available
                 const tagHTML = generateNametagHTML();
                 document.getElementById('nametag-preview').innerHTML = tagHTML;
                 document.getElementById('nametag-to-print').innerHTML = tagHTML;
                 
-                console.log("[DEBUG] STEP 7: Check-in Success, showing Success Stage");
                 showStage('stage-success');
                 startResetTimer();
             } catch (e) {
-                console.error("[DEBUG] Check-in Process Error:", e.message);
                 alert("Error: " + e.message);
             } finally {
                 setLoading(false);
@@ -254,7 +252,6 @@
         }
 
         function startResetTimer() {
-            console.log("[DEBUG] STEP 8: Timer Started (30 seconds)");
             let timeLeft = 30;
             const timerEl = document.getElementById('timer');
             const interval = setInterval(() => {
