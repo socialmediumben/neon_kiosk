@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Social Medium Check-In Kiosk</title>
+    <title>Social Medium ID Check-In</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .stage { display: none; }
@@ -12,49 +12,33 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4 text-center">
 
-    <div id="main-container" class="w-full max-w-2xl bg-white p-8 rounded-3xl shadow-2xl text-center">
+    <div id="main-container" class="w-full max-w-lg bg-white p-10 rounded-3xl shadow-2xl">
         
-        <div id="stage-sync" class="stage active-stage">
-            <h1 class="text-3xl font-bold text-gray-800 mb-4">Initializing Kiosk</h1>
-            <div class="flex justify-center my-8">
-                <div class="spinner"></div>
-            </div>
-            <p id="sync-status" class="text-blue-600 font-medium">Connecting to Neon CRM...</p>
-        </div>
-
-        <div id="stage-search" class="stage">
+        <div id="stage-search" class="stage active-stage">
             <h1 class="text-4xl font-extrabold text-gray-800 mb-2">Check-In</h1>
-            <p class="text-gray-500 mb-8 text-lg">Enter your phone number to begin.</p>
-            <input type="tel" id="search-input" class="w-full p-5 text-4xl border-2 border-gray-200 rounded-2xl mb-6 text-center tracking-widest focus:border-cyan-500 outline-none transition-all" placeholder="8186466823">
-            <button onclick="handleSearch()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold hover:bg-cyan-700 active:scale-95 transition-all shadow-lg">Find My Account</button>
-            <button onclick="toggleDebug()" class="mt-8 text-xs text-gray-300 uppercase tracking-widest hover:text-gray-500">View Lookup Table</button>
+            <p class="text-gray-500 mb-8">Enter your Neon Account ID to begin.</p>
+            <input type="number" id="id-input" class="w-full p-5 text-4xl border-2 border-gray-100 rounded-2xl mb-6 text-center focus:border-cyan-500 outline-none transition-all" placeholder="1147">
+            <button onclick="handleIdLookup()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold hover:bg-cyan-700 active:scale-95 transition-all shadow-lg">Lookup Account</button>
         </div>
 
-        <div id="stage-results" class="stage">
-            <h1 class="text-3xl font-bold mb-8 text-gray-800">Select Your Name</h1>
-            <div id="results-list" class="space-y-4 max-h-[400px] overflow-y-auto p-2"></div>
-            <div class="flex space-x-4 mt-8">
-                <button onclick="showStage('stage-search')" class="flex-1 py-4 border-2 border-gray-200 rounded-2xl text-xl font-semibold text-gray-600">Back</button>
-                <button onclick="processCheckIn()" id="checkin-btn" disabled class="flex-[2] py-4 bg-gray-400 text-white rounded-2xl text-xl font-bold shadow-lg">Confirm Check-In</button>
-            </div>
+        <div id="stage-confirm" class="stage">
+            <div id="account-info" class="mb-8"></div>
+            <div id="action-area"></div>
+            <button onclick="showStage('stage-search')" class="mt-8 text-gray-400 font-semibold hover:underline">Start Over</button>
         </div>
 
-        <div id="stage-success" class="stage">
+        <div id="stage-success" class="stage text-green-600">
             <div class="text-6xl mb-6">✅</div>
-            <h1 class="text-4xl font-bold text-green-600 mb-4">You're All Set!</h1>
-            <p class="text-xl text-gray-600 mb-8">Have a great time at Social Medium.</p>
-            <button onclick="location.reload()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold">Done</button>
+            <h1 class="text-4xl font-bold mb-4">Success!</h1>
+            <p class="text-xl text-gray-600 mb-8" id="success-msg"></p>
+            <button onclick="location.reload()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold">Next Person</button>
         </div>
 
-        <div id="debug-table" class="hidden mt-10 text-left border-t pt-6">
-            <h2 class="font-bold text-gray-400 mb-2 uppercase text-xs">Internal Lookup Table</h2>
-            <div class="max-h-40 overflow-y-auto text-[10px] font-mono bg-gray-50 p-2 rounded border">
-                <table class="w-full">
-                    <tbody id="debug-body"></tbody>
-                </table>
-            </div>
+        <div id="loader" class="hidden mt-6 flex flex-col items-center">
+            <div class="spinner"></div>
+            <p class="mt-2 text-gray-500" id="loader-text">Loading...</p>
         </div>
     </div>
 
@@ -62,152 +46,97 @@
         const API_PROXY_URL = window.location.origin;
         const WAIVER_FIELD_ID = "87";
         const SYSTEM_USER_ID = "1153";
-        
-        let accountLookupTable = []; 
-        let selectedAccounts = [];
+        let currentAccount = null;
 
-        // 1. SYNC ALL ACCOUNTS ON LOAD
-        window.onload = async () => {
-            let currentPage = 0;
-            let totalPages = 1;
-            const statusEl = document.getElementById('sync-status');
+        async function handleIdLookup() {
+            const id = document.getElementById('id-input').value.trim();
+            if (!id) return alert("Please enter an Account ID.");
 
+            setLoading(true, "Finding account...");
             try {
-                while (currentPage < totalPages) {
-                    statusEl.textContent = `Syncing Database... Batch ${currentPage + 1}`;
-                    
-                    const res = await fetch(`${API_PROXY_URL}/discovery/bulk-accounts?page=${currentPage}`);
-                    const data = await res.json();
+                // Pulling directly by ID - most reliable Neon method
+                const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/${id}`);
+                const data = await res.json();
 
-                    if (data.searchResults) {
-                        accountLookupTable = accountLookupTable.concat(data.searchResults);
-                        totalPages = data.pagination.totalPages;
-                        currentPage++;
-                    } else {
-                        throw new Error("Sync failed to retrieve data.");
-                    }
+                if (!res.ok || !data.individualAccount) {
+                    throw new Error("Account not found. Please double-check your ID.");
                 }
-                showStage('stage-search');
-                populateDebug();
+
+                currentAccount = data.individualAccount;
+                renderConfirmation();
             } catch (e) {
-                statusEl.textContent = "Sync Error. Please check connection and refresh.";
-                statusEl.className = "text-red-600 font-bold";
+                alert(e.message);
+            } finally {
+                setLoading(false);
             }
-        };
-
-        // 2. LOCAL SEARCH (Instant)
-        function handleSearch() {
-            const input = document.getElementById('search-input').value.replace(/\D/g, '');
-            if (input.length < 4) return alert("Please enter at least 4 digits.");
-
-            // Search by cleaning stored phone numbers to match input digits
-            const matches = accountLookupTable.filter(acc => {
-                const storedPhone = (acc["Phone1"] || "").replace(/\D/g, '');
-                return storedPhone.includes(input) || acc["Account ID"] === input;
-            });
-
-            renderResults(matches);
         }
 
-        // 3. RENDER SEARCH RESULTS
-        async function renderResults(accounts) {
-            const list = document.getElementById('results-list');
-            list.innerHTML = '';
-            selectedAccounts = [];
-            document.getElementById('checkin-btn').disabled = true;
-            document.getElementById('checkin-btn').className = "flex-[2] py-4 bg-gray-400 text-white rounded-2xl text-xl font-bold shadow-lg";
-
-            if (accounts.length === 0) {
-                list.innerHTML = '<p class="text-gray-400 py-8">No accounts found. Please see staff for help!</p>';
-            }
-
-            for (const acc of accounts) {
-                const id = acc["Account ID"];
-                
-                // Fetch full profile to verify Waiver ID 87 status
-                const profileRes = await fetch(`${API_PROXY_URL}/api/v2/accounts/${id}`);
-                const fullData = await profileRes.json();
-                const individual = fullData.individualAccount;
-                
-                const waiver = (individual.accountCustomFields || []).find(f => f.id === WAIVER_FIELD_ID);
-                const isSigned = waiver && waiver.value && waiver.value.trim() !== "";
-
-                const card = document.createElement('div');
-                card.className = `p-6 border-2 rounded-2xl text-left transition-all ${!isSigned ? 'bg-red-50 border-red-100 opacity-60' : 'bg-white border-gray-100 cursor-pointer hover:border-cyan-500 hover:shadow-md'}`;
-                
-                card.innerHTML = `
-                    <div class="text-2xl font-bold text-gray-800">${acc["First Name"]} ${acc["Last Name"]}</div>
-                    <div class="text-sm ${isSigned ? 'text-cyan-600' : 'text-red-500'} font-medium">
-                        ${isSigned ? '✓ Waiver on file' : '⚠ Waiver missing - See staff'}
-                    </div>
-                `;
-
-                if (isSigned) {
-                    card.onclick = () => toggleSelect(acc, card);
-                } else {
-                    card.onclick = () => alert("Waiver required. Please ask a staff member to update your account.");
-                }
-                list.appendChild(card);
-            }
-            showStage('stage-results');
-        }
-
-        function toggleSelect(acc, element) {
-            const idx = selectedAccounts.findIndex(a => a["Account ID"] === acc["Account ID"]);
-            if(idx > -1) {
-                selectedAccounts.splice(idx, 1);
-                element.classList.remove('ring-4', 'ring-cyan-500', 'border-cyan-500');
-            } else {
-                selectedAccounts.push(acc);
-                element.classList.add('ring-4', 'ring-cyan-500', 'border-cyan-500');
-            }
-            const btn = document.getElementById('checkin-btn');
-            btn.disabled = selectedAccounts.length === 0;
-            btn.className = selectedAccounts.length === 0 
-                ? "flex-[2] py-4 bg-gray-400 text-white rounded-2xl text-xl font-bold" 
-                : "flex-[2] py-4 bg-cyan-600 text-white rounded-2xl text-xl font-bold shadow-lg";
-        }
-
-        // 4. PROCESS FINAL CHECK-IN
-        async function processCheckIn() {
-            const statusEl = document.getElementById('sync-status');
-            showStage('stage-sync');
-            statusEl.textContent = "Checking you in...";
+        function renderConfirmation() {
+            const info = document.getElementById('account-info');
+            const actions = document.getElementById('action-area');
+            const contact = currentAccount.primaryContact;
             
+            // Check Waiver Field 87
+            const waiver = (currentAccount.accountCustomFields || []).find(f => f.id === WAIVER_FIELD_ID);
+            const isSigned = waiver && waiver.value && waiver.value.trim() !== "";
+
+            info.innerHTML = `
+                <div class="text-3xl font-bold text-gray-800">${contact.firstName} ${contact.lastName}</div>
+                <div class="text-lg text-gray-500 mt-2">ID: ${currentAccount.accountId}</div>
+            `;
+
+            if (isSigned) {
+                actions.innerHTML = `
+                    <div class="bg-green-50 text-green-700 p-4 rounded-xl mb-6 font-medium">✓ Waiver Verified</div>
+                    <button onclick="confirmCheckIn()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold shadow-lg hover:bg-cyan-700">Confirm Check-In</button>
+                `;
+            } else {
+                actions.innerHTML = `
+                    <div class="bg-red-50 text-red-700 p-4 rounded-xl mb-6 font-medium">⚠ Waiver Required</div>
+                    <p class="text-gray-600 mb-6">Please see a staff member to sign your waiver.</p>
+                `;
+            }
+            showStage('stage-confirm');
+        }
+
+        async function confirmCheckIn() {
+            setLoading(true, "Checking you in...");
             const now = new Date();
             try {
-                for (const acc of selectedAccounts) {
-                    await fetch(`${API_PROXY_URL}/api/v2/activities`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            subject: "Check-In",
-                            status: "Completed",
-                            accountId: acc["Account ID"],
-                            assignedTo: SYSTEM_USER_ID,
-                            startDate: now.toISOString().split('T')[0],
-                            startTime: now.toTimeString().split(' ')[0].substring(0, 5)
-                        })
-                    });
+                const res = await fetch(`${API_PROXY_URL}/api/v2/activities`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        subject: "Check-In",
+                        status: "Completed",
+                        accountId: currentAccount.accountId,
+                        assignedTo: SYSTEM_USER_ID,
+                        startDate: now.toISOString().split('T')[0],
+                        startTime: now.toTimeString().split(' ')[0].substring(0, 5)
+                    })
+                });
+
+                if (res.ok) {
+                    document.getElementById('success-msg').textContent = `${currentAccount.primaryContact.firstName} is checked in!`;
+                    showStage('stage-success');
+                } else {
+                    throw new Error("Could not record check-in.");
                 }
-                showStage('stage-success');
             } catch (e) {
-                alert("Check-in failed: " + e.message);
-                showStage('stage-results');
+                alert(e.message);
+            } finally {
+                setLoading(false);
             }
         }
 
-        // UTILS
         function showStage(id) {
             document.querySelectorAll('.stage').forEach(s => s.classList.remove('active-stage'));
             document.getElementById(id).classList.add('active-stage');
         }
 
-        function toggleDebug() { document.getElementById('debug-table').classList.toggle('hidden'); }
-
-        function populateDebug() {
-            const body = document.getElementById('debug-body');
-            body.innerHTML = accountLookupTable.map(a => `<tr><td>${a["Account ID"]}</td><td>${a["First Name"]} ${a["Last Name"]}</td><td>${a["Phone1"] || '-'}</td></tr>`).join('');
+        function setLoading(show, text) {
+            document.getElementById('loader').classList.toggle('hidden', !show);
+            document.getElementById('loader-text').textContent = text;
         }
     </script>
 </body>
