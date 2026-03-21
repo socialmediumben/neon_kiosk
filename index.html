@@ -32,12 +32,10 @@
 
         <div id="stage-waiver" class="stage">
             <h1 class="text-3xl font-bold text-gray-800 mb-4">Sign Waiver</h1>
-            <p class="text-gray-600 mb-6">Scan the code below or use the link to complete your waiver.</p>
+            <p class="text-gray-600 mb-6">Scan the code or use the link to complete your waiver.</p>
             <div id="qrcode-direct" class="qrcode-container mb-6 flex justify-center bg-white p-4 rounded-lg inline-block mx-auto border border-gray-100"></div>
             <div class="mb-8">
-                <a href="https://socialmedium.app.neoncrm.com/forms/waiver" target="_blank" class="text-cyan-600 font-bold text-lg underline break-all">
-                    socialmedium.app.neoncrm.com/forms/waiver
-                </a>
+                <a href="https://socialmedium.app.neoncrm.com/forms/waiver" target="_blank" class="text-cyan-600 font-bold text-lg underline break-all">socialmedium.app.neoncrm.com/forms/waiver</a>
             </div>
             <button onclick="showStage('stage-search')" class="w-full py-4 bg-gray-200 text-gray-700 rounded-2xl text-xl font-bold">Back to Check-In</button>
         </div>
@@ -48,11 +46,18 @@
             <button onclick="showStage('stage-search')" class="mt-8 text-gray-400 font-semibold hover:underline">Start Over</button>
         </div>
 
-        <div id="stage-success" class="stage text-green-600">
-            <div class="text-6xl mb-6">✅</div>
-            <h1 class="text-4xl font-bold mb-4">Success!</h1>
-            <p class="text-xl text-gray-600 mb-8" id="success-msg"></p>
-            <button onclick="location.reload()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold">Next Person</button>
+        <div id="stage-success" class="stage">
+            <div class="text-6xl mb-4 text-green-600">✅</div>
+            <h1 class="text-4xl font-bold text-green-600 mb-2">Success!</h1>
+            <p class="text-xl text-gray-600 mb-6" id="success-msg"></p>
+            
+            <div class="bg-cyan-50 p-6 rounded-2xl mb-6">
+                <p class="text-cyan-800 font-bold mb-3">Check out our upcoming events!</p>
+                <div id="qrcode-events" class="qrcode-container mb-4 flex justify-center bg-white p-3 rounded-xl inline-block mx-auto border border-cyan-100"></div>
+                <p class="text-xs text-cyan-600">Scan to view the event calendar</p>
+            </div>
+
+            <button onclick="location.reload()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold">Next Person <span id="timer">(5)</span></button>
         </div>
 
         <div id="loader" class="hidden mt-6 flex flex-col items-center">
@@ -66,6 +71,7 @@
         const WAIVER_FIELD_ID = "87";
         const SYSTEM_USER_ID = "3508"; 
         const WAIVER_URL = "https://socialmedium.app.neoncrm.com/forms/waiver";
+        const EVENTS_URL = "https://socialmedium.app.neoncrm.com/np/constituent/eventList.do?orgId=socialmedium";
         let currentAccount = null;
 
         async function handleIdLookup() {
@@ -87,16 +93,16 @@
 
         function showWaiverOnly() {
             showStage('stage-waiver');
-            generateWaiverQR("qrcode-direct");
+            generateQR("qrcode-direct", WAIVER_URL);
         }
 
-        function generateWaiverQR(elementId) {
+        function generateQR(elementId, url) {
             const container = document.getElementById(elementId);
-            container.innerHTML = ""; // Clear existing
+            container.innerHTML = ""; 
             new QRCode(container, {
-                text: WAIVER_URL,
-                width: 180,
-                height: 180
+                text: url,
+                width: 160,
+                height: 160
             });
         }
 
@@ -104,7 +110,6 @@
             const info = document.getElementById('account-info');
             const actions = document.getElementById('action-area');
             const contact = currentAccount.primaryContact;
-            
             const waiver = (currentAccount.accountCustomFields || []).find(f => f.id === WAIVER_FIELD_ID);
             const isSigned = (waiver && waiver.value && waiver.value.trim() !== "") || 
                              (waiver && waiver.optionValues && waiver.optionValues.length > 0);
@@ -128,7 +133,7 @@
                         <a href="${WAIVER_URL}" target="_blank" class="text-cyan-600 font-bold underline">Open Link</a>
                     </div>
                 `;
-                setTimeout(() => generateWaiverQR("qrcode-confirm"), 50);
+                setTimeout(() => generateQR("qrcode-confirm", WAIVER_URL), 50);
             }
             showStage('stage-confirm');
         }
@@ -157,13 +162,29 @@
                     body: JSON.stringify(payload)
                 });
                 if (!response.ok) throw new Error("Check-in failed");
+                
                 document.getElementById('success-msg').textContent = `${currentAccount.primaryContact.firstName} is checked in!`;
                 showStage('stage-success');
+                generateQR("qrcode-events", EVENTS_URL);
+                startResetTimer();
             } catch (e) {
                 alert("Error: " + e.message);
             } finally {
                 setLoading(false);
             }
+        }
+
+        function startResetTimer() {
+            let timeLeft = 5;
+            const timerEl = document.getElementById('timer');
+            const interval = setInterval(() => {
+                timeLeft--;
+                timerEl.textContent = `(${timeLeft})`;
+                if (timeLeft <= 0) {
+                    clearInterval(interval);
+                    location.reload();
+                }
+            }, 1000);
         }
 
         function showStage(id) {
