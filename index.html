@@ -2,49 +2,43 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Neon Phone Search Test</title>
+    <title>Neon Phone Key Finder</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 flex items-center justify-center min-h-screen p-4">
 
-    <div class="w-full max-w-lg bg-white p-8 rounded-2xl shadow-xl">
-        <h1 class="text-2xl font-bold text-center mb-6">Phone Search Test</h1>
+    <div class="w-full max-w-lg bg-white p-8 rounded-2xl shadow-xl text-center">
+        <h1 class="text-2xl font-bold mb-6">Find the Correct Phone Key</h1>
         
-        <p class="text-gray-500 text-sm mb-2 text-center text-balance">
-            Try searching for your digits (e.g., 8186466823).
-        </p>
-        <input type="tel" id="phone-input" class="w-full p-4 border rounded-lg mb-4 text-center text-xl" placeholder="8186466823">
+        <input type="tel" id="phone-input" class="w-full p-4 border rounded-lg mb-6 text-center text-xl" placeholder="8186466823">
         
-        <button onclick="testPhoneSearch()" class="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700">
-            Search Phone1 (CONTAIN)
-        </button>
+        <div class="grid grid-cols-1 gap-3">
+            <button onclick="testKey('Phone')" class="py-3 bg-blue-600 text-white rounded-lg font-bold">Try Key: "Phone"</button>
+            <button onclick="testKey('Mobile Phone')" class="py-3 bg-indigo-600 text-white rounded-lg font-bold">Try Key: "Mobile Phone"</button>
+            <button onclick="testKey('Work Phone')" class="py-3 bg-cyan-600 text-white rounded-lg font-bold">Try Key: "Work Phone"</button>
+        </div>
 
-        <div class="mt-8 p-4 bg-black rounded-lg">
-            <p class="text-green-400 font-mono text-xs uppercase mb-2">Neon Response:</p>
-            <pre id="console" class="text-white font-mono text-sm overflow-auto max-h-96">Waiting for search...</pre>
+        <div class="mt-8 p-4 bg-black rounded-lg text-left">
+            <p class="text-green-400 font-mono text-xs uppercase mb-2">Response for <span id="active-key">...</span>:</p>
+            <pre id="console" class="text-white font-mono text-sm overflow-auto max-h-64">Select a key to test.</pre>
         </div>
     </div>
 
     <script>
-        async function testPhoneSearch() {
-            // Clean the input to just digits for the search
+        async function testKey(keyName) {
             const val = document.getElementById('phone-input').value.replace(/\D/g, '');
             const output = document.getElementById('console');
-            output.textContent = `Searching Phone1 for "${val}"...`;
+            document.getElementById('active-key').textContent = keyName;
+            output.textContent = "Testing...";
             
             try {
                 const res = await fetch(`${window.location.origin}/api/v2/accounts/search?userType=INDIVIDUAL`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        pagination: {
-                            currentPage: 0,
-                            pageSize: 10,
-                            sortColumn: "Last Name",
-                            sortDirection: "ASC"
-                        },
+                        pagination: { currentPage: 0, pageSize: 5 },
                         searchFields: [{
-                            field: "Phone1",
+                            field: keyName,
                             operator: "CONTAIN",
                             value: val
                         }],
