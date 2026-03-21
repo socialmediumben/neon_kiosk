@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon CRM Test Kiosk</title>
+    <title>Neon CRM Debug Kiosk</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .stage { display: none; }
@@ -16,10 +16,15 @@
 
     <div id="main-container" class="w-full max-w-2xl bg-white p-8 rounded-2xl shadow-lg text-center">
         <div id="stage-search" class="stage active-stage">
-            <h1 class="text-4xl font-bold text-gray-800">Test Search</h1>
-            <p class="text-gray-500 my-4">Search by phone digits (e.g. 5551234567)</p>
-            <input type="tel" id="search-input" class="w-full p-4 text-2xl border rounded-md mb-4 text-center" placeholder="Phone Number">
+            <h1 class="text-4xl font-bold text-gray-800">Account Search</h1>
+            <p class="text-gray-500 my-4">Enter phone digits to test search.</p>
+            <input type="tel" id="search-input" class="w-full p-4 text-2xl border rounded-md mb-4 text-center" placeholder="5551234567">
             <button onclick="searchAccounts()" class="w-full py-4 bg-blue-600 text-white rounded-xl text-xl hover:bg-blue-700 transition">Search Neon</button>
+            
+            <div id="example-box" class="mt-10 p-4 border-2 border-dashed border-blue-300 rounded-xl bg-blue-50 text-left">
+                <p class="text-xs font-bold text-blue-500 uppercase tracking-widest mb-2">Live Connection Test: Example Account</p>
+                <div id="example-content" class="text-sm text-gray-600 italic">Attempting to pull example account...</div>
+            </div>
         </div>
 
         <div id="stage-results" class="stage text-left">
@@ -37,70 +42,73 @@
     <script>
         const API_PROXY_URL = window.location.origin;
 
+        // Automatically load an example account on startup
+        window.onload = fetchExampleAccount;
+
+        async function fetchExampleAccount() {
+            const exampleDiv = document.getElementById('example-content');
+            try {
+                // Performing a search with no criteria to get the first available account
+                const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/search`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pagination: { pageSize: 1, currentPage: 0 },
+                        searchFields: [], // No criteria = pull any record
+                        outputFields: ["First Name", "Last Name", "Phone", "Account ID", "Account Custom Fields", "Common Custom Fields", "Individual Custom Fields"]
+                    })
+                });
+                const data = await res.json();
+                
+                if (data.searchResults && data.searchResults.length > 0) {
+                    const acc = data.searchResults[0];
+                    const allFields = [...(acc["Account Custom Fields"] || []), ...(acc["Common Custom Fields"] || []), ...(acc["Individual Custom Fields"] || [])];
+                    const fieldSummary = allFields.map(f => `${f.fieldName}: ${f.value}`).join(' | ');
+                    
+                    exampleDiv.innerHTML = `
+                        <div class="font-bold text-blue-900">${acc["First Name"]} ${acc["Last Name"]}</div>
+                        <div><strong>Phone in Neon:</strong> ${acc["Phone"] || 'None listed'}</div>
+                        <div><strong>Account ID:</strong> ${acc["Account ID"]}</div>
+                        <div class="mt-2 text-xs text-gray-500"><strong>Fields Found:</strong> ${fieldSummary || 'None'}</div>
+                    `;
+                } else {
+                    exampleDiv.textContent = "Connection successful, but no accounts were returned.";
+                }
+            } catch (e) {
+                exampleDiv.innerHTML = `<span class="text-red-500 font-bold">Connection Failed:</span> ${e.message}`;
+            }
+        }
+
         async function searchAccounts() {
             const phone = document.getElementById('search-input').value.replace(/\D/g, '');
             if (phone.length < 4) return alert("Enter at least 4 digits.");
 
             document.getElementById('loader').classList.remove('hidden');
-            
             try {
                 const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/search`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         searchFields: [{ field: "Phone", operator: "CONTAIN", value: phone }],
-                        outputFields: [
-                            "First Name", 
-                            "Last Name", 
-                            "Account ID", 
-                            "Account Custom Fields", 
-                            "Common Custom Fields", 
-                            "Individual Custom Fields"
-                        ]
+                        outputFields: ["First Name", "Last Name", "Account ID", "Account Custom Fields", "Common Custom Fields", "Individual Custom Fields"]
                     })
                 });
                 const data = await res.json();
                 renderResults(data.searchResults || []);
-            } catch (e) { 
-                alert("Error: " + e.message); 
-            } finally {
-                document.getElementById('loader').classList.add('hidden');
-            }
+            } catch (e) { alert("Error: " + e.message); }
+            finally { document.getElementById('loader').classList.add('hidden'); }
         }
 
         function renderResults(accounts) {
             const list = document.getElementById('results-list');
             list.innerHTML = '';
-            
             if (accounts.length === 0) {
-                list.innerHTML = '<p class="text-center text-red-500 font-bold">No accounts found in Neon CRM for those digits.</p>';
+                list.innerHTML = '<p class="text-center text-red-500 font-bold">No accounts found.</p>';
             }
-
             accounts.forEach(acc => {
                 const div = document.createElement('div');
                 div.className = "p-4 border-2 rounded-xl bg-slate-50";
-                
-                // Combine all possible fields to see what data is actually coming through
-                const allFields = [
-                    ...(acc["Account Custom Fields"] || []), 
-                    ...(acc["Common Custom Fields"] || []),
-                    ...(acc["Individual Custom Fields"] || [])
-                ];
-
-                const fieldSummary = allFields.length > 0 
-                    ? allFields.map(f => `<li><strong>${f.fieldName}:</strong> ${f.value}</li>`).join('')
-                    : "<li>No custom fields found</li>";
-
-                div.innerHTML = `
-                    <div class="text-xl font-bold text-blue-800">${acc["First Name"]} ${acc["Last Name"]}</div>
-                    <div class="text-sm text-gray-500 mb-2">Account ID: ${acc["Account ID"]}</div>
-                    <div class="bg-white p-3 border rounded text-xs font-mono">
-                        <p class="font-bold border-b mb-1">Detected Custom Fields:</p>
-                        <ul class="list-disc ml-4">
-                            ${fieldSummary}
-                        </ul>
-                    </div>
-                `;
+                div.innerHTML = `<div class="text-xl font-bold">${acc["First Name"]} ${acc["Last Name"]}</div><div class="text-sm">ID: ${acc["Account ID"]}</div>`;
                 list.appendChild(div);
             });
             showStage('stage-results');
