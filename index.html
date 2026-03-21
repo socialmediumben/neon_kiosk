@@ -14,7 +14,7 @@
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4 text-center">
 
-    <div id="main-container" class="w-full max-w-lg bg-white p-10 rounded-3xl shadow-2xl">
+    <div id="main-container" class="w-full max-w-2xl bg-white p-10 rounded-3xl shadow-2xl">
         
         <div id="stage-search" class="stage active-stage">
             <h1 class="text-4xl font-extrabold text-gray-800 mb-2">Check-In</h1>
@@ -26,6 +26,14 @@
         <div id="stage-confirm" class="stage">
             <div id="account-info" class="mb-8"></div>
             <div id="action-area"></div>
+            
+            <div class="mt-8 pt-6 border-t border-gray-100 text-left">
+                <button onclick="document.getElementById('raw-json').classList.toggle('hidden')" class="text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600">
+                    [+] View Raw Profile Data
+                </button>
+                <pre id="raw-json" class="hidden mt-4 p-4 bg-slate-900 text-cyan-400 text-[10px] font-mono rounded-lg overflow-auto max-h-64"></pre>
+            </div>
+
             <button onclick="showStage('stage-search')" class="mt-8 text-gray-400 font-semibold hover:underline">Start Over</button>
         </div>
 
@@ -54,7 +62,6 @@
 
             setLoading(true, "Finding account...");
             try {
-                // Pulling directly by ID - most reliable Neon method
                 const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/${id}`);
                 const data = await res.json();
 
@@ -74,8 +81,12 @@
         function renderConfirmation() {
             const info = document.getElementById('account-info');
             const actions = document.getElementById('action-area');
+            const jsonDisplay = document.getElementById('raw-json');
             const contact = currentAccount.primaryContact;
             
+            // Display the Raw JSON for debugging
+            jsonDisplay.textContent = JSON.stringify(currentAccount, null, 2);
+
             // Check Waiver Field 87
             const waiver = (currentAccount.accountCustomFields || []).find(f => f.id === WAIVER_FIELD_ID);
             const isSigned = waiver && waiver.value && waiver.value.trim() !== "";
@@ -92,8 +103,8 @@
                 `;
             } else {
                 actions.innerHTML = `
-                    <div class="bg-red-50 text-red-700 p-4 rounded-xl mb-6 font-medium">⚠ Waiver Required</div>
-                    <p class="text-gray-600 mb-6">Please see a staff member to sign your waiver.</p>
+                    <div class="bg-red-50 text-red-700 p-4 rounded-xl mb-6 font-medium">⚠ Waiver Required (Field 87)</div>
+                    <p class="text-gray-600 mb-6">Field 87 value: "${waiver ? waiver.value : 'Not Found'}"</p>
                 `;
             }
             showStage('stage-confirm');
