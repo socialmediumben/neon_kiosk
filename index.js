@@ -19,11 +19,26 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// BULK SEARCH: Now uses POST to request Phone1 specifically
 app.get('/discovery/bulk-accounts', async (req, res) => {
     const page = req.query.page || 0;
     try {
-        const response = await fetch(`https://api.neoncrm.com/v2/accounts?pageSize=200&currentPage=${page}&userType=INDIVIDUAL`, {
-            headers: { 'Authorization': `Basic ${getNeonAuth()}` }
+        const response = await fetch(`https://api.neoncrm.com/v2/accounts/search?userType=INDIVIDUAL`, {
+            method: 'POST',
+            headers: { 
+                'Authorization': `Basic ${getNeonAuth()}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                searchFields: [], // Empty means "get everyone"
+                outputFields: ["First Name", "Last Name", "Account ID", "Phone1", "Email"],
+                pagination: {
+                    currentPage: parseInt(page),
+                    pageSize: 200,
+                    sortColumn: "Last Name",
+                    sortDirection: "ASC"
+                }
+            })
         });
         const data = await response.json();
         res.json(data);
