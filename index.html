@@ -16,29 +16,36 @@
 
     <div id="main-container" class="w-full max-w-xl bg-white p-8 rounded-2xl shadow-lg text-center">
         <div id="stage-search" class="stage active-stage">
-            <h1 class="text-4xl font-bold">Welcome</h1>
-            <p class="text-gray-500 my-4">Enter phone number to check in</p>
-            <input type="tel" id="search-input" class="w-full p-4 text-2xl border rounded mb-4" placeholder="(555) 555-5555">
-            <button onclick="searchAccounts()" class="w-full py-4 bg-cyan-600 text-white rounded-xl text-xl">Search</button>
+            <h1 class="text-4xl font-bold text-gray-800">Customer Check-In</h1>
+            <p class="text-gray-500 my-4">Enter your phone number to begin.</p>
+            <input type="tel" id="search-input" class="w-full p-4 text-2xl border rounded-md mb-4 text-center" placeholder="(555) 555-5555">
+            <button onclick="searchAccounts()" class="w-full py-4 bg-cyan-600 text-white rounded-xl text-xl hover:bg-cyan-700 transition">Search</button>
         </div>
 
         <div id="stage-results" class="stage">
-            <h1 class="text-3xl font-bold mb-6">Who is here?</h1>
+            <h1 class="text-3xl font-bold mb-6 text-gray-800">Who is checking in?</h1>
             <div id="results-list" class="space-y-4"></div>
-            <button onclick="checkInSelected()" id="checkin-btn" disabled class="mt-8 w-full py-4 bg-gray-400 text-white rounded-xl text-xl">Check In</button>
+            <div class="flex space-x-4 mt-8">
+                <button onclick="showStage('stage-search')" class="flex-1 py-4 border-2 rounded-xl text-xl">Back</button>
+                <button onclick="checkInSelected()" id="checkin-btn" disabled class="flex-[2] py-4 bg-gray-400 text-white rounded-xl text-xl">Check In</button>
+            </div>
         </div>
 
         <div id="stage-success" class="stage">
-            <h1 class="text-4xl font-bold text-green-600">Success!</h1>
-            <p class="my-6 text-xl">You are checked in.</p>
-            <button onclick="location.reload()" class="w-full py-4 bg-cyan-600 text-white rounded-xl">Done</button>
+            <h1 class="text-4xl font-bold text-green-600">Check-In Successful!</h1>
+            <p class="my-6 text-xl text-gray-600">Welcome to Social Medium.</p>
+            <button onclick="location.reload()" class="w-full py-4 bg-cyan-600 text-white rounded-xl text-xl">Done</button>
         </div>
 
-        <div id="loader" class="hidden mt-4 flex justify-center items-center"><div class="spinner"></div></div>
+        <div id="loader" class="hidden mt-6 flex flex-col items-center">
+            <div class="spinner"></div>
+            <p class="mt-2 text-gray-500" id="loader-text">Loading...</p>
+        </div>
     </div>
 
     <script>
-        const API_PROXY_URL = 'PASTE_YOUR_RENDER_URL_HERE'; 
+        // --- CONFIGURATION ---
+        const API_PROXY_URL = 'https://neon-kiosk.onrender.com'; // Update if your URL changes
         const WAIVER_FIELD_ID = 'PASTE_FIELD_ID_HERE'; // Find this via /discovery/fields
         const SYSTEM_USER_ID = "1153";
 
@@ -46,10 +53,11 @@
 
         async function searchAccounts() {
             const phone = document.getElementById('search-input').value.replace(/\D/g, '');
-            document.getElementById('loader').classList.remove('hidden');
+            if (!phone) return;
+
+            setLoading(true, 'Searching Neon CRM...');
             
             try {
-                // Neon Search Individual Accounts
                 const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/search`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -60,58 +68,90 @@
                 });
                 const data = await res.json();
                 renderResults(data.searchResults || []);
-            } catch (e) { alert("Search Error: " + e.message); }
-            document.getElementById('loader').classList.add('hidden');
+            } catch (e) { 
+                alert("Search Error: " + e.message); 
+            } finally {
+                setLoading(false);
+            }
         }
 
         function renderResults(accounts) {
             const list = document.getElementById('results-list');
             list.innerHTML = '';
+            
+            if (accounts.length === 0) {
+                list.innerHTML = '<p class="text-gray-500 py-4">No accounts found. Please sign the waiver first.</p>';
+            }
+
             accounts.forEach(acc => {
                 const div = document.createElement('div');
-                div.className = "p-4 border-2 rounded-xl cursor-pointer text-xl font-bold";
+                div.className = "p-4 border-2 rounded-xl cursor-pointer text-xl font-bold transition-all";
                 div.textContent = `${acc["First Name"]} ${acc["Last Name"]}`;
-                div.onclick = () => {
-                    div.classList.toggle('bg-cyan-50');
-                    div.classList.toggle('border-cyan-600');
-                    toggleSelect(acc);
-                };
+                div.onclick = () => toggleSelect(acc, div);
                 list.appendChild(div);
             });
             showStage('stage-results');
         }
 
-        function toggleSelect(acc) {
+        function toggleSelect(acc, element) {
             const idx = selectedAccounts.indexOf(acc);
-            if(idx > -1) selectedAccounts.splice(idx, 1);
-            else selectedAccounts.push(acc);
-            document.getElementById('checkin-btn').disabled = selectedAccounts.length === 0;
-            document.getElementById('checkin-btn').className = selectedAccounts.length === 0 ? "mt-8 w-full py-4 bg-gray-400 text-white rounded-xl text-xl" : "mt-8 w-full py-4 bg-cyan-600 text-white rounded-xl text-xl";
+            if(idx > -1) {
+                selectedAccounts.splice(idx, 1);
+                element.classList.remove('bg-cyan-50', 'border-cyan-600');
+            } else {
+                selectedAccounts.push(acc);
+                element.classList.add('bg-cyan-50', 'border-cyan-600');
+            }
+            
+            const btn = document.getElementById('checkin-btn');
+            btn.disabled = selectedAccounts.length === 0;
+            btn.className = selectedAccounts.length === 0 
+                ? "flex-[2] py-4 bg-gray-400 text-white rounded-xl text-xl" 
+                : "flex-[2] py-4 bg-cyan-600 text-white rounded-xl text-xl hover:bg-cyan-700";
         }
 
         async function checkInSelected() {
+            setLoading(true, 'Recording Check-In...');
             const now = new Date();
-            for (const acc of selectedAccounts) {
-                // Create Neon Activity
-                await fetch(`${API_PROXY_URL}/api/v2/activities`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        subject: "Check-In",
-                        status: "Completed",
-                        accountId: acc["Account ID"],
-                        assignedTo: SYSTEM_USER_ID,
-                        startDate: now.toISOString().split('T')[0],
-                        startTime: now.toTimeString().split(' ')[0].substring(0, 5)
-                    })
-                });
+            
+            try {
+                for (const acc of selectedAccounts) {
+                    // Create Neon Activity
+                    await fetch(`${API_PROXY_URL}/api/v2/activities`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            subject: "Check-In",
+                            status: "Completed",
+                            accountId: acc["Account ID"],
+                            assignedTo: SYSTEM_USER_ID,
+                            startDate: now.toISOString().split('T')[0],
+                            startTime: now.toTimeString().split(' ')[0].substring(0, 5)
+                        })
+                    });
+                }
+                showStage('stage-success');
+            } catch (e) {
+                alert("Check-in failed: " + e.message);
+            } finally {
+                setLoading(false);
             }
-            showStage('stage-success');
         }
 
         function showStage(id) {
             document.querySelectorAll('.stage').forEach(s => s.classList.remove('active-stage'));
             document.getElementById(id).classList.add('active-stage');
+        }
+
+        function setLoading(isLoading, text = 'Loading...') {
+            const loader = document.getElementById('loader');
+            document.getElementById('loader-text').textContent = text;
+            if (isLoading) {
+                loader.classList.remove('hidden');
+                document.getElementById('checkin-btn').disabled = true;
+            } else {
+                loader.classList.add('hidden');
+            }
         }
     </script>
 </body>
