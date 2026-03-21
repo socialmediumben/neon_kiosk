@@ -2,25 +2,24 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Neon CRM Final Search Test</title>
+    <title>Neon CRM Search - Fixed</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 flex items-center justify-center min-h-screen p-4">
 
     <div class="w-full max-w-lg bg-white p-8 rounded-2xl shadow-xl">
-        <h1 class="text-2xl font-bold text-center mb-6">Neon CRM Search</h1>
+        <h1 class="text-2xl font-bold text-center mb-6 text-gray-800">Customer Search</h1>
         
-        <p class="text-gray-500 text-sm mb-2 text-center">Search for any Individual Account</p>
         <input type="text" id="search-value" class="w-full p-4 border rounded-lg mb-4 text-center text-xl" placeholder="Last Name or Phone">
         
         <div class="grid grid-cols-2 gap-4">
-            <button onclick="runSearch('Last Name')" class="py-3 bg-blue-600 text-white rounded-lg font-bold">Search by Name</button>
-            <button onclick="runSearch('Phone')" class="py-3 bg-indigo-600 text-white rounded-lg font-bold">Search by Phone</button>
+            <button onclick="runSearch('Last Name')" class="py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">Search by Name</button>
+            <button onclick="runSearch('Phone')" class="py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700">Search by Phone</button>
         </div>
 
         <div class="mt-8 p-4 bg-black rounded-lg">
             <p class="text-green-400 font-mono text-xs uppercase mb-2">Neon Response:</p>
-            <pre id="console" class="text-white font-mono text-sm overflow-auto max-h-64">Results will appear here...</pre>
+            <pre id="console" class="text-white font-mono text-sm overflow-auto max-h-96">Waiting for search...</pre>
         </div>
     </div>
 
@@ -28,20 +27,31 @@
         async function runSearch(fieldType) {
             const val = document.getElementById('search-value').value;
             const output = document.getElementById('console');
-            output.textContent = `Searching ${fieldType} for "${val}"...`;
+            output.textContent = `Searching ${fieldType}...`;
             
             try {
-                // We are now including 'userType' which Neon explicitly requested
+                // Neon v2 Search requires: userType, pagination, and searchFields
                 const res = await fetch(`${window.location.origin}/api/v2/accounts/search?userType=INDIVIDUAL`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        pagination: {
+                            currentPage: 0,
+                            pageSize: 10
+                        },
                         searchFields: [{
                             field: fieldType,
                             operator: fieldType === 'Phone' ? "CONTAIN" : "EQUAL",
                             value: val
                         }],
-                        outputFields: ["First Name", "Last Name", "Account ID", "Account Custom Fields"]
+                        outputFields: [
+                            "First Name", 
+                            "Last Name", 
+                            "Account ID", 
+                            "Account Custom Fields",
+                            "Individual Custom Fields",
+                            "Common Custom Fields"
+                        ]
                     })
                 });
                 
