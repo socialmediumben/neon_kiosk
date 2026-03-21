@@ -19,6 +19,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Full API Proxy for direct account lookups and check-in activities
 app.all('/api/*', async (req, res) => {
     try {
         const neonPath = req.path.replace('/api', '');
@@ -45,4 +46,4 @@ app.all('/api/*', async (req, res) => {
     }
 });
 
-app.listen(port, () => console.log(`Neon Kiosk Proxy active on port ${port}`));
+app.listen(port, () => console.log(`Kiosk Proxy active on port ${port}`));
