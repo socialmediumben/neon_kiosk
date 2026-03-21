@@ -1,49 +1,143 @@
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Medium ID Check-In</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .stage { display: none; }
+        .active-stage { display: block; }
+        .spinner { border: 4px solid rgba(0,0,0,0.1); width: 32px; height: 32px; border-radius: 50%; border-left-color: #0891b2; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4 text-center">
 
-const app = express();
-const port = process.env.PORT || 3000;
-
-app.use(cors());
-app.use(express.json());
-
-const getNeonAuth = () => {
-    const orgId = process.env.NEON_ORG_ID;
-    const apiKey = process.env.NEON_API_KEY;
-    return Buffer.from(`${orgId}:${apiKey}`).toString('base64');
-};
-
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Proxy all Neon API calls
-app.all('/api/*', async (req, res) => {
-    try {
-        const neonPath = req.path.replace('/api', '');
-        const url = `https://api.neoncrm.com${neonPath}${req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : ''}`;
+    <div id="main-container" class="w-full max-w-lg bg-white p-10 rounded-3xl shadow-2xl">
         
-        const fetchOptions = {
-            method: req.method,
-            headers: { 
-                'Authorization': `Basic ${getNeonAuth()}`, 
-                'Content-Type': 'application/json' 
-            }
-        };
+        <div id="stage-search" class="stage active-stage">
+            <h1 class="text-4xl font-extrabold text-gray-800 mb-2">Check-In</h1>
+            <p class="text-gray-500 mb-8">Enter your Neon Account ID to begin.</p>
+            <input type="number" id="id-input" class="w-full p-5 text-4xl border-2 border-gray-100 rounded-2xl mb-6 text-center focus:border-cyan-500 outline-none transition-all" placeholder="1147">
+            <button onclick="handleIdLookup()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold hover:bg-cyan-700 active:scale-95 transition-all shadow-lg">Lookup Account</button>
+        </div>
 
-        if (['POST', 'PATCH', 'PUT'].includes(req.method)) {
-            fetchOptions.body = JSON.stringify(req.body);
+        <div id="stage-confirm" class="stage">
+            <div id="account-info" class="mb-8"></div>
+            <div id="action-area"></div>
+            <button onclick="showStage('stage-search')" class="mt-8 text-gray-400 font-semibold hover:underline">Start Over</button>
+        </div>
+
+        <div id="stage-success" class="stage text-green-600">
+            <div class="text-6xl mb-6">✅</div>
+            <h1 class="text-4xl font-bold mb-4">Success!</h1>
+            <p class="text-xl text-gray-600 mb-8" id="success-msg"></p>
+            <button onclick="location.reload()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold">Next Person</button>
+        </div>
+
+        <div id="loader" class="hidden mt-6 flex flex-col items-center">
+            <div class="spinner"></div>
+            <p class="mt-2 text-gray-500" id="loader-text">Loading...</p>
+        </div>
+    </div>
+
+    <script>
+        const API_PROXY_URL = window.location.origin;
+        const WAIVER_FIELD_ID = "87";
+        const SYSTEM_USER_ID = "1153";
+        let currentAccount = null;
+
+        async function handleIdLookup() {
+            const id = document.getElementById('id-input').value.trim();
+            if (!id) return alert("Please enter an Account ID.");
+
+            setLoading(true, "Finding account...");
+            try {
+                // Pulling directly by ID - most reliable Neon method
+                const res = await fetch(`${API_PROXY_URL}/api/v2/accounts/${id}`);
+                const data = await res.json();
+
+                if (!res.ok || !data.individualAccount) {
+                    throw new Error("Account not found. Please double-check your ID.");
+                }
+
+                currentAccount = data.individualAccount;
+                renderConfirmation();
+            } catch (e) {
+                alert(e.message);
+            } finally {
+                setLoading(false);
+            }
         }
 
-        const response = await fetch(url, fetchOptions);
-        const data = await response.json();
-        res.status(response.status).json(data);
-    } catch (error) {
-        console.error("Proxy Error:", error.message);
-        res.status(500).json({ error: 'Neon API Connection Failed' });
-    }
-});
+        function renderConfirmation() {
+            const info = document.getElementById('account-info');
+            const actions = document.getElementById('action-area');
+            const contact = currentAccount.primaryContact;
+            
+            // Check Waiver Field 87
+            const waiver = (currentAccount.accountCustomFields || []).find(f => f.id === WAIVER_FIELD_ID);
+            const isSigned = waiver && waiver.value && waiver.value.trim() !== "";
 
-app.listen(port, () => console.log(`Neon Kiosk Proxy active on port ${port}`));
+            info.innerHTML = `
+                <div class="text-3xl font-bold text-gray-800">${contact.firstName} ${contact.lastName}</div>
+                <div class="text-lg text-gray-500 mt-2">ID: ${currentAccount.accountId}</div>
+            `;
+
+            if (isSigned) {
+                actions.innerHTML = `
+                    <div class="bg-green-50 text-green-700 p-4 rounded-xl mb-6 font-medium">✓ Waiver Verified</div>
+                    <button onclick="confirmCheckIn()" class="w-full py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold shadow-lg hover:bg-cyan-700">Confirm Check-In</button>
+                `;
+            } else {
+                actions.innerHTML = `
+                    <div class="bg-red-50 text-red-700 p-4 rounded-xl mb-6 font-medium">⚠ Waiver Required</div>
+                    <p class="text-gray-600 mb-6">Please see a staff member to sign your waiver.</p>
+                `;
+            }
+            showStage('stage-confirm');
+        }
+
+        async function confirmCheckIn() {
+            setLoading(true, "Checking you in...");
+            const now = new Date();
+            try {
+                const res = await fetch(`${API_PROXY_URL}/api/v2/activities`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        subject: "Check-In",
+                        status: "Completed",
+                        accountId: currentAccount.accountId,
+                        assignedTo: SYSTEM_USER_ID,
+                        startDate: now.toISOString().split('T')[0],
+                        startTime: now.toTimeString().split(' ')[0].substring(0, 5)
+                    })
+                });
+
+                if (res.ok) {
+                    document.getElementById('success-msg').textContent = `${currentAccount.primaryContact.firstName} is checked in!`;
+                    showStage('stage-success');
+                } else {
+                    throw new Error("Could not record check-in.");
+                }
+            } catch (e) {
+                alert(e.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function showStage(id) {
+            document.querySelectorAll('.stage').forEach(s => s.classList.remove('active-stage'));
+            document.getElementById(id).classList.add('active-stage');
+        }
+
+        function setLoading(show, text) {
+            document.getElementById('loader').classList.toggle('hidden', !show);
+            document.getElementById('loader-text').textContent = text;
+        }
+    </script>
+</body>
+</html>
