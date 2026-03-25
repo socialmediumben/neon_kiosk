@@ -70,6 +70,16 @@
                     </div>
                     <p class="text-xl text-gray-600 mb-6" id="success-msg"></p>
                     <div id="nametag-final-preview"></div>
+
+                    <div class="mt-8 bg-slate-50 p-6 rounded-2xl border border-slate-200 no-print">
+                        <p class="font-bold text-slate-800 mb-4 text-xl">Attending a Club Today? (Optional)</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button onclick="logExtraClub('Cosplay Club Check-In', this)" class="py-3 bg-cyan-100 text-cyan-800 rounded-xl font-bold hover:bg-cyan-200 border border-cyan-300 transition-colors">Cosplay Club</button>
+                            <button onclick="logExtraClub('Electronics Club Check-In', this)" class="py-3 bg-cyan-100 text-cyan-800 rounded-xl font-bold hover:bg-cyan-200 border border-cyan-300 transition-colors">Electronics Club</button>
+                            <button onclick="logExtraClub('TTRPG Club Check-In', this)" class="py-3 bg-cyan-100 text-cyan-800 rounded-xl font-bold hover:bg-cyan-200 border border-cyan-300 transition-colors">TTRPG Club</button>
+                            <button onclick="logExtraClub('Process Art Club Check-In', this)" class="py-3 bg-cyan-100 text-cyan-800 rounded-xl font-bold hover:bg-cyan-200 border border-cyan-300 transition-colors">Process Art Club</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="ml-10 bg-cyan-50 p-6 rounded-3xl border border-cyan-100 text-center">
@@ -202,28 +212,51 @@
             const waiver = (currentAccount.accountCustomFields || []).find(f => f.id === WAIVER_FIELD_ID);
             const isSigned = (waiver && waiver.value && waiver.value.trim() !== "") || (waiver && waiver.optionValues && waiver.optionValues.length > 0);
 
-            preview.innerHTML = generateNametagHTML();
-
             if (isSigned) {
-                const checkInOptions = [
-                    "Check-In",
-                    "Cosplay Club Check-In",
-                    "Electronics Club Check-In",
-                    "TTRPG Club Check-In",
-                    "Process Art Club Check-In"
-                ];
-                let buttonsHtml = '';
-                checkInOptions.forEach(opt => {
-                    buttonsHtml += `<button onclick="confirmCheckIn('${opt}')" class="w-full max-w-md py-4 bg-cyan-600 text-white rounded-2xl text-2xl font-bold hover:bg-cyan-700 shadow-lg mx-auto block mb-3">${opt}</button>`;
-                });
-                actions.innerHTML = buttonsHtml;
-            } else {
-                actions.innerHTML = `<div class="bg-red-50 text-red-700 p-6 rounded-xl max-w-md mx-auto"><div id="qrcode-confirm" class="mb-6 flex justify-center bg-white p-4 rounded-lg inline-block mx-auto"></div><br><a href="${WAIVER_URL}" target="_blank" class="font-bold underline text-2xl">Sign Waiver</a></div>`;
+                confirmCheckIn('Check-In');
+                return;
+            }
+
+            preview.innerHTML = generateNametagHTML();
+            actions.innerHTML = `<div class="bg-red-50 text-red-700 p-6 rounded-xl max-w-md mx-auto"><div id="qrcode-confirm" class="mb-6 flex justify-center bg-white p-4 rounded-lg inline-block mx-auto"></div><br><a href="${WAIVER_URL}" target="_blank" class="font-bold underline text-2xl">Sign Waiver</a></div>`;
                 setTimeout(() => {
                     new QRCode(document.getElementById("qrcode-confirm"), { text: WAIVER_URL, width: 200, height: 200 });
                 }, 50);
             }
             showStage('stage-confirm');
+        }
+
+        async function logExtraClub(subject, btn) {
+            btn.disabled = true;
+            btn.classList.replace('bg-cyan-100', 'bg-slate-200');
+            btn.classList.replace('text-cyan-800', 'text-slate-500');
+            btn.classList.replace('hover:bg-cyan-200', 'cursor-default');
+            btn.textContent = "Logging...";
+            
+            const now = new Date();
+            const dateOptions = { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' };
+            const parts = new Intl.DateTimeFormat('en-US', dateOptions).formatToParts(now);
+            const d = `${parts.find(p => p.type === 'year').value}-${parts.find(p => p.type === 'month').value}-${parts.find(p => p.type === 'day').value}`;
+            const t = now.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour12: false, hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            const payload = {
+                "subject": subject,
+                "activityDates": { "startDate": d, "startTime": t, "timeZone": { "id": "1" } },
+                "clientAccount": [{ "accountId": String(currentAccount.accountId) }],
+                "systemUserId": [ String(SYSTEM_USER_ID) ],
+                "status": { "id": "4" },
+                "priority": "Low"
+            };
+
+            try {
+                const response = await fetch(`${API_PROXY_URL}/api/v2/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error("Check-in failed");
+                btn.classList.replace('bg-slate-200', 'bg-green-100');
+                btn.classList.replace('text-slate-500', 'text-green-800');
+                btn.textContent = "✅ Logged!";
+            } catch (e) {
+                btn.textContent = "❌ Error";
+            }
         }
 
         async function confirmCheckIn(subject = "Check-In") {
@@ -232,7 +265,7 @@
             const dateOptions = { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' };
             const parts = new Intl.DateTimeFormat('en-US', dateOptions).formatToParts(now);
             const d = `${parts.find(p => p.type === 'year').value}-${parts.find(p => p.type === 'month').value}-${parts.find(p => p.type === 'day').value}`;
-            const t = now.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true });
+            const t = now.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour12: false, hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
             const payload = {
                 "subject": subject,
