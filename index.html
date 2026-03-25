@@ -219,10 +219,10 @@
 
             preview.innerHTML = generateNametagHTML();
             actions.innerHTML = `<div class="bg-red-50 text-red-700 p-6 rounded-xl max-w-md mx-auto"><div id="qrcode-confirm" class="mb-6 flex justify-center bg-white p-4 rounded-lg inline-block mx-auto"></div><br><a href="${WAIVER_URL}" target="_blank" class="font-bold underline text-2xl">Sign Waiver</a></div>`;
-                setTimeout(() => {
-                    new QRCode(document.getElementById("qrcode-confirm"), { text: WAIVER_URL, width: 200, height: 200 });
-                }, 50);
-            }
+            setTimeout(() => {
+                new QRCode(document.getElementById("qrcode-confirm"), { text: WAIVER_URL, width: 200, height: 200 });
+            }, 50);
+            
             showStage('stage-confirm');
         }
 
