@@ -1,49 +1,59 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Neon ID Finder</title>
+    <title>Neon CRM ID Finder</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-900 text-white p-10">
-    <h1 class="text-2xl font-bold mb-5">Neon CRM Waiver ID Finder</h1>
-    <p class="mb-5 text-slate-400">Click the button below to scan all your Neon fields for the word "Waiver".</p>
+    <h1 class="text-2xl font-bold mb-5">Neon CRM Field ID Finder</h1>
+    <p class="mb-5 text-slate-400">Enter a keyword (e.g. "Solicitation") and scan your Neon CRM custom fields.</p>
     
-    <button onclick="findID()" class="bg-cyan-500 hover:bg-cyan-600 px-6 py-3 rounded-lg font-bold">
-        Scan My Neon CRM
-    </button>
+    <div class="flex space-x-4 mb-6">
+        <input type="text" id="keyword" value="Solicitation" class="px-4 py-3 rounded-lg text-black w-64" placeholder="Field keyword...">
+        <button onclick="findID()" class="bg-cyan-500 hover:bg-cyan-600 px-6 py-3 rounded-lg font-bold">
+            Scan My Neon CRM
+        </button>
+    </div>
 
     <div id="results" class="mt-10 space-y-4"></div>
 
     <script>
         async function findID() {
+            const keyword = document.getElementById('keyword').value.trim().toLowerCase();
             const resultsDiv = document.getElementById('results');
+            if(!keyword) return alert("Enter a keyword");
+            
             resultsDiv.innerHTML = "Searching...";
             
             // We check the categories one by one through your existing proxy
-            const categories = ['Individual', 'Account', 'Common'];
+            const categories = ['Individual', 'Account', 'Common', 'Activity', 'Donation', 'Event'];
             let found = false;
+            let html = "";
 
             for (const cat of categories) {
                 try {
                     const response = await fetch(`/api/v2/customFields?category=${cat}`);
+                    if (!response.ok) continue;
                     const fields = await response.json();
                     
-                    // Look for the Waiver field
-                    const match = fields.find(f => 
-                        (f.name && f.name.toLowerCase().includes("waiver")) || 
-                        (f.displayName && f.displayName.toLowerCase().includes("waiver"))
+                    const matches = fields.filter(f => 
+                        (f.name && f.name.toLowerCase().includes(keyword)) || 
+                        (f.displayName && f.displayName.toLowerCase().includes(keyword))
                     );
 
-                    if (match) {
-                        resultsDiv.innerHTML = `
-                            <div class="bg-green-900 border border-green-500 p-6 rounded-lg">
+                    for (const match of matches) {
+                        html += `
+                            <div class="bg-green-900 border border-green-500 p-6 rounded-lg mb-4">
                                 <h2 class="text-xl font-bold text-green-400">✅ Field Found!</h2>
                                 <p class="mt-2"><strong>Field Name:</strong> ${match.name}</p>
                                 <p><strong>Field ID:</strong> <span class="text-yellow-400 text-2xl font-mono">${match.id}</span></p>
                                 <p><strong>Category:</strong> ${cat}</p>
+                                <div class="mt-2 text-sm text-gray-300">
+                                    <strong>Options:</strong>
+                                    ${(match.optionValues || []).map(o => `<br>- ${o.name} (ID: ${o.id})`).join('') || "None"}
+                                </div>
                             </div>`;
                         found = true;
-                        break;
                     }
                 } catch (e) {
                     console.error(e);
@@ -51,7 +61,9 @@
             }
 
             if (!found) {
-                resultsDiv.innerHTML = "<div class='text-red-400'>❌ No field with 'Waiver' found. Try checking 'Settings > Custom Fields' in Neon to see the exact name.</div>";
+                resultsDiv.innerHTML = `<div class='text-red-400'>❌ No field with '${keyword}' found in the common categories. It might be a standard field, or check 'Settings > Custom Fields' in Neon to verify the spelling.</div>`;
+            } else {
+                resultsDiv.innerHTML = html;
             }
         }
     </script>

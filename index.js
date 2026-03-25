@@ -19,6 +19,9 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Serve everything else, like discovery.html
+app.use(express.static(__dirname));
+
 // Full API Proxy for direct account lookups and check-in activities
 app.all('/api/*', async (req, res) => {
     try {
