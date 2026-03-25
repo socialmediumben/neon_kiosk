@@ -1,69 +1,110 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Neon CRM ID Finder</title>
+    <title>Neon CRM API Tester</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 text-white p-10">
-    <h1 class="text-2xl font-bold mb-5">Neon CRM Field ID Finder</h1>
-    <p class="mb-5 text-slate-400">Enter a keyword (e.g. "Solicitation") and scan your Neon CRM custom fields.</p>
-    
-    <div class="flex space-x-4 mb-6">
-        <input type="text" id="keyword" value="Solicitation" class="px-4 py-3 rounded-lg text-black w-64" placeholder="Field keyword...">
-        <button onclick="findID()" class="bg-cyan-500 hover:bg-cyan-600 px-6 py-3 rounded-lg font-bold">
-            Scan My Neon CRM
-        </button>
+<body class="bg-slate-900 text-white p-10 font-sans">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-2">Neon CRM API Explorer</h1>
+        <p class="mb-8 text-slate-400">Run any API V2 request through the proxy to inspect raw responses.</p>
+        
+        <div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700">
+            <div class="flex space-x-4 mb-4">
+                <select id="method" class="bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white font-bold outline-none focus:border-cyan-500" onchange="toggleBody()">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PATCH">PATCH</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                </select>
+                <div class="flex-1 flex items-center bg-slate-900 border border-slate-600 rounded-lg overflow-hidden focus-within:border-cyan-500">
+                    <span class="px-3 text-slate-400 font-mono">/api/v2/</span>
+                    <input type="text" id="endpoint" class="w-full bg-transparent outline-none py-2 text-white font-mono" placeholder="customFields?category=Activity" value="customFields?category=Activity">
+                </div>
+                <button onclick="runRequest()" class="bg-cyan-500 hover:bg-cyan-600 px-8 py-2 rounded-lg font-bold transition-colors">
+                    Send Request
+                </button>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-sm text-slate-400 mb-2 font-bold">Request Body (JSON) <span class="text-xs font-normal opacity-70">- required for POST/PATCH</span></label>
+                <textarea id="payload" rows="6" disabled class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-green-400 font-mono text-sm outline-none focus:border-cyan-500 opacity-50 transition-opacity" placeholder='{&#10;  "searchFields": []&#10;}' spellcheck="false"></textarea>
+            </div>
+        </div>
+
+        <div class="mt-8">
+            <h2 class="text-xl font-bold mb-3 text-slate-300">Response</h2>
+            <div id="status-container" class="hidden text-sm font-bold"></div>
+            <pre id="response-output" class="bg-slate-950 border border-slate-800 rounded-xl p-5 overflow-x-auto text-yellow-300 font-mono text-sm shadow-inner min-h-[200px] mt-3">Click 'Send Request' to see results</pre>
+        </div>
     </div>
 
-    <div id="results" class="mt-10 space-y-4"></div>
-
     <script>
-        async function findID() {
-            const keyword = document.getElementById('keyword').value.trim().toLowerCase();
-            const resultsDiv = document.getElementById('results');
-            if(!keyword) return alert("Enter a keyword");
+        function toggleBody() {
+            const method = document.getElementById('method').value;
+            const payload = document.getElementById('payload');
+            const isBodyAllowed = ['POST', 'PUT', 'PATCH'].includes(method);
+            payload.disabled = !isBodyAllowed;
             
-            resultsDiv.innerHTML = "Searching...";
+            if(!isBodyAllowed) payload.classList.add('opacity-50');
+            else payload.classList.remove('opacity-50');
+        }
+
+        async function runRequest() {
+            const method = document.getElementById('method').value;
+            let endpoint = document.getElementById('endpoint').value.trim();
+            const payloadStr = document.getElementById('payload').value.trim();
+            const out = document.getElementById('response-output');
+            const statusBox = document.getElementById('status-container');
             
-            // We check the categories one by one through your existing proxy
-            const categories = ['Individual', 'Account', 'Common', 'Activity', 'Donation', 'Event'];
-            let found = false;
-            let html = "";
+            // Clean up the input nicely for them
+            if (endpoint.startsWith('/')) endpoint = endpoint.substring(1);
+            if (endpoint.startsWith('api/v2/')) endpoint = endpoint.replace('api/v2/', '');
+            
+            out.textContent = "Loading...";
+            out.classList.replace('text-yellow-300', 'text-slate-400');
+            out.classList.replace('text-red-400', 'text-slate-400');
+            statusBox.classList.add('hidden');
 
-            for (const cat of categories) {
-                try {
-                    const response = await fetch(`/api/v2/customFields?category=${cat}`);
-                    if (!response.ok) continue;
-                    const fields = await response.json();
-                    
-                    const matches = fields.filter(f => 
-                        (f.name && f.name.toLowerCase().includes(keyword)) || 
-                        (f.displayName && f.displayName.toLowerCase().includes(keyword))
-                    );
-
-                    for (const match of matches) {
-                        html += `
-                            <div class="bg-green-900 border border-green-500 p-6 rounded-lg mb-4">
-                                <h2 class="text-xl font-bold text-green-400">✅ Field Found!</h2>
-                                <p class="mt-2"><strong>Field Name:</strong> ${match.name}</p>
-                                <p><strong>Field ID:</strong> <span class="text-yellow-400 text-2xl font-mono">${match.id}</span></p>
-                                <p><strong>Category:</strong> ${cat}</p>
-                                <div class="mt-2 text-sm text-gray-300">
-                                    <strong>Options:</strong>
-                                    ${(match.optionValues || []).map(o => `<br>- ${o.name} (ID: ${o.id})`).join('') || "None"}
-                                </div>
-                            </div>`;
-                        found = true;
+            const options = { method };
+            
+            if (['POST', 'PUT', 'PATCH'].includes(method)) {
+                if (payloadStr) {
+                    try {
+                        JSON.parse(payloadStr); // Check valid JSON
+                        options.body = payloadStr;
+                        options.headers = { 'Content-Type': 'application/json' };
+                    } catch (e) {
+                        out.textContent = "Invalid Request Body JSON:\n" + e.message;
+                        out.classList.replace('text-slate-400', 'text-red-400');
+                        return;
                     }
-                } catch (e) {
-                    console.error(e);
+                } else {
+                    options.body = "{}"; // Send empty object if left blank just in case
+                    options.headers = { 'Content-Type': 'application/json' };
                 }
             }
 
-            if (!found) {
-                resultsDiv.innerHTML = `<div class='text-red-400'>❌ No field with '${keyword}' found in the common categories. It might be a standard field, or check 'Settings > Custom Fields' in Neon to verify the spelling.</div>`;
-            } else {
-                resultsDiv.innerHTML = html;
+            try {
+                const res = await fetch(`/api/v2/${endpoint}`, options);
+                
+                statusBox.classList.remove('hidden');
+                statusBox.textContent = `Status: ${res.status} ${res.statusText}`;
+                statusBox.className = `inline-block px-3 py-1 rounded text-sm font-bold ${res.ok ? 'bg-green-900 border border-green-500 text-green-300' : 'bg-red-900 border border-red-500 text-red-300'}`;
+
+                const text = await res.text();
+                try {
+                    const data = JSON.parse(text);
+                    out.textContent = JSON.stringify(data, null, 2);
+                    out.classList.replace('text-slate-400', 'text-yellow-300');
+                } catch {
+                    out.textContent = text || "(Empty Response)";
+                    out.classList.replace('text-slate-400', 'text-yellow-300');
+                }
+            } catch (e) {
+                out.textContent = "Network Error:\n" + e.message;
+                out.classList.replace('text-slate-400', 'text-red-400');
             }
         }
     </script>
