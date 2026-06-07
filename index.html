@@ -201,16 +201,16 @@
             const combinedInterests = [interests, customInterests].filter(i => i !== "").join(", ");
 
             const isActive = membership.toLowerCase() === 'active';
-            const badgeContent = isActive ? '<span class="text-5xl leading-none">★</span>' : '';
+            const badgeHTML = isActive 
+                ? '<div class="h-24 w-24 flex items-center justify-center text-8xl leading-none text-black">★</div>'
+                : '<div class="border-4 border-black rounded-full h-24 w-24"></div>';
 
             return `
                 <div class="border-[12px] border-black rounded-[40px] p-12 text-left bg-white w-full max-w-3xl aspect-[3/2] flex flex-col justify-between">
                     <div>
                         <div class="flex justify-between items-start">
                             <div class="text-8xl font-black uppercase tracking-tighter text-black">${name}</div>
-                            <div class="border-4 border-black rounded-full h-24 w-24 flex items-center justify-center text-center text-black">
-                                ${badgeContent}
-                            </div>
+                            ${badgeHTML}
                         </div>
                         <div class="text-3xl font-bold mt-4 text-black">Pronouns: ${pronouns}</div>
                     </div>
