@@ -136,7 +136,18 @@
             const data = await res.json();
             if (!res.ok || !data.individualAccount) throw new Error("Account not found.");
             currentAccount = data.individualAccount;
+            updateBackgroundForMembership();
             renderConfirmation();
+        }
+
+        function updateBackgroundForMembership() {
+            const membership = (currentAccount && currentAccount.accountCurrentMembershipStatus) || "None";
+            const isActive = membership.toLowerCase() === 'active';
+            if (isActive) {
+                document.body.style.backgroundColor = '#3BC03D';
+            } else {
+                document.body.style.backgroundColor = '#F16622FF';
+            }
         }
 
         async function searchAccountsByName(lastName) {
@@ -315,6 +326,9 @@
         function showStage(id) {
             document.querySelectorAll('.stage').forEach(s => s.classList.remove('active-stage'));
             document.getElementById(id).classList.add('active-stage');
+            if (id === 'stage-search' || id === 'stage-results' || id === 'stage-waiver') {
+                document.body.style.backgroundColor = '';
+            }
         }
 
         function setLoading(show, text) {
