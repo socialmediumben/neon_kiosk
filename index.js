@@ -41,11 +41,16 @@ app.all('/api/*', async (req, res) => {
         }
 
         const response = await fetch(url, fetchOptions);
-        const data = await response.json();
-        res.status(response.status).json(data);
+        const text = await response.text();
+        try {
+            const data = JSON.parse(text);
+            res.status(response.status).json(data);
+        } catch (e) {
+            res.status(response.status).send(text);
+        }
     } catch (error) {
         console.error("Proxy Error:", error.message);
-        res.status(500).json({ error: 'Neon API Connection Failed' });
+        res.status(500).json({ error: 'Neon API Connection Failed', message: error.message });
     }
 });
 
