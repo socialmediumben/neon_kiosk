@@ -255,6 +255,15 @@
             const d = `${parts.find(p => p.type === 'year').value}-${parts.find(p => p.type === 'month').value}-${parts.find(p => p.type === 'day').value}`;
             const t = now.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true });
 
+            const statusMap = {
+                "Cosplay Club Check-In": "7",
+                "Creative Teens Club Check-In": "8",
+                "Electronics Club Check-In": "10",
+                "TTRPG Club Check-In": "11",
+                "Process Art Club Check-In": "12"
+            };
+            const customStatusId = statusMap[subject];
+
             const payload = {
                 "subject": subject,
                 "activityDates": { "startDate": d, "startTime": t, "timeZone": { "id": "82" } },
@@ -263,6 +272,10 @@
                 "status": { "id": "4" },
                 "priority": "Low"
             };
+
+            if (customStatusId) {
+                payload.customStatus = { "id": customStatusId };
+            }
 
             try {
                 const response = await fetch(`${API_PROXY_URL}/api/v2/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
