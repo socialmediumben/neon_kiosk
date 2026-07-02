@@ -415,7 +415,7 @@
             btn.className = "px-4 py-2 bg-slate-200 text-slate-400 rounded-lg font-bold text-sm cursor-default";
 
             const now = new Date();
-            const dateStr = now.toISOString();
+            const dateStr = now.toISOString().split('.')[0] + 'Z';
 
             const payload = {
                 eventId: String(eventId),
