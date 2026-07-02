@@ -81,6 +81,13 @@
                             <button onclick="logExtraClub('Creative Teens Club Check-In', this)" class="col-span-2 py-3 bg-cyan-100 text-cyan-800 rounded-xl font-bold hover:bg-cyan-200 border border-cyan-300 transition-colors">Creative Teens Club Check-In</button>
                         </div>
                     </div>
+
+                    <div class="mt-6 bg-slate-50 p-6 rounded-2xl border border-slate-200 no-print">
+                        <p class="font-bold text-slate-800 mb-4 text-xl">RSVP for Upcoming Events (Optional)</p>
+                        <div id="upcoming-events-list" class="space-y-3">
+                            <!-- Loaded dynamically -->
+                        </div>
+                    </div>
                 </div>
 
                 <div class="ml-10 bg-cyan-50 p-6 rounded-3xl border border-cyan-100 text-center">
@@ -113,6 +120,25 @@
         const WAIVER_URL = "https://socialmedium.app.neoncrm.com/forms/waiver";
         const EVENTS_URL = "https://socialmedium.app.neoncrm.com/np/constituent/eventList.do?orgId=socialmedium";
         let currentAccount = null;
+        let upcomingEvents = [];
+
+        async function loadUpcomingEvents() {
+            try {
+                const response = await fetch(`${API_PROXY_URL}/api/v2/events`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const events = data.searchResults || data || [];
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    upcomingEvents = events
+                        .filter(e => !e.archived && e.startDate >= todayStr)
+                        .sort((a, b) => a.startDate.localeCompare(b.startDate))
+                        .slice(0, 3);
+                }
+            } catch (e) {
+                console.error("Error loading events:", e);
+            }
+        }
+        loadUpcomingEvents();
 
         async function handleSearch() {
             const input = document.getElementById('search-input').value.trim();
@@ -321,6 +347,130 @@
             }
         }
 
+        function renderUpcomingEventsRSVP() {
+            const container = document.getElementById('upcoming-events-list');
+            if (!container) return;
+            if (upcomingEvents.length === 0) {
+                container.innerHTML = `<p class="text-gray-500 text-sm">No upcoming events found.</p>`;
+                return;
+            }
+
+            const membership = currentAccount.accountCurrentMembershipStatus || "None";
+            const isMember = membership.toLowerCase() === 'active';
+
+            container.innerHTML = upcomingEvents.map(event => {
+                const dateParts = event.startDate.split('-');
+                const formattedDate = `${dateParts[1]}/${dateParts[2]}`; // MM/DD
+                const regUrl = `https://socialmedium.app.neoncrm.com/np/clients/socialmedium/eventRegistration.jsp?event=${event.id}`;
+                
+                return `
+                    <div class="flex items-center justify-between bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <div class="flex-1 min-w-0 pr-4 text-left">
+                            <div class="font-bold text-slate-800 text-lg truncate">${event.name}</div>
+                            <div class="text-slate-500 text-sm font-semibold">${formattedDate} ${event.startTime ? 'at ' + formatTime(event.startTime) : ''}</div>
+                        </div>
+                        <div class="no-print">
+                            ${isMember ? `
+                                <button onclick="rsvpForEvent(${event.id}, this)" class="px-4 py-2 bg-cyan-600 text-white rounded-lg font-bold text-sm hover:bg-cyan-700 transition-colors shadow-sm">RSVP (Free)</button>
+                            ` : `
+                                <button onclick="showEventQR('${regUrl}', '${event.name.replace(/'/g, "\\'")}')" class="px-4 py-2 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-bold text-sm hover:bg-slate-200 transition-colors">Register</button>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function formatTime(timeStr) {
+            if (!timeStr) return '';
+            const parts = timeStr.split(':');
+            let hour = parseInt(parts[0]);
+            const minute = parts[1];
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            hour = hour % 12;
+            hour = hour ? hour : 12;
+            return `${hour}:${minute} ${ampm}`;
+        }
+
+        async function rsvpForEvent(eventId, btn) {
+            btn.disabled = true;
+            btn.textContent = "Registering...";
+            btn.className = "px-4 py-2 bg-slate-200 text-slate-400 rounded-lg font-bold text-sm cursor-default";
+
+            const now = new Date();
+            const dateStr = now.toISOString();
+
+            const payload = {
+                eventId: String(eventId),
+                registrantAccountId: String(currentAccount.accountId),
+                registrationDateTime: dateStr,
+                totalCharge: 0,
+                registrationAmount: 0,
+                tickets: [
+                    {
+                        attendees: [
+                            { accountId: String(currentAccount.accountId) }
+                        ]
+                    }
+                ]
+            };
+
+            try {
+                const response = await fetch(`${API_PROXY_URL}/api/v2/eventRegistrations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    if (data && data[0] && (data[0].code === '1124' || (data[0].message && data[0].message.includes("Neon Events")))) {
+                        const regUrl = `https://socialmedium.app.neoncrm.com/np/clients/socialmedium/eventRegistration.jsp?event=${eventId}`;
+                        const eventName = upcomingEvents.find(e => e.id == eventId)?.name || "Event";
+                        showEventQR(regUrl, eventName, true);
+                        
+                        btn.textContent = "RSVP on Phone";
+                        btn.className = "px-4 py-2 bg-amber-100 text-amber-800 border border-amber-200 rounded-lg font-bold text-sm hover:bg-amber-200 cursor-pointer";
+                        btn.disabled = false;
+                        btn.onclick = () => showEventQR(regUrl, eventName, true);
+                        return;
+                    }
+                    throw new Error(data && data[0] && data[0].message ? data[0].message : "Registration failed");
+                }
+
+                btn.textContent = "✅ Registered!";
+                btn.className = "px-4 py-2 bg-green-100 text-green-800 rounded-lg font-bold text-sm cursor-default shadow-sm";
+            } catch (e) {
+                console.error("RSVP error:", e);
+                btn.textContent = "❌ Error";
+                btn.disabled = false;
+                setTimeout(() => {
+                    btn.textContent = "RSVP (Free)";
+                    btn.className = "px-4 py-2 bg-cyan-600 text-white rounded-lg font-bold text-sm hover:bg-cyan-700 shadow-sm";
+                }, 3000);
+            }
+        }
+
+        function showEventQR(url, eventName, isNextGen = false) {
+            document.getElementById('event-modal-title').textContent = eventName;
+            if (isNextGen) {
+                document.getElementById('event-modal-subtitle').textContent = "This is a Next-Gen event. Please scan the QR code to RSVP on your phone.";
+            } else {
+                document.getElementById('event-modal-subtitle').textContent = "Please scan the QR code to register and pay on your phone.";
+            }
+            
+            const container = document.getElementById('qrcode-event-modal');
+            container.innerHTML = "";
+            new QRCode(container, { text: url, width: 200, height: 200 });
+            
+            document.getElementById('event-modal').classList.remove('hidden');
+        }
+
+        function closeEventModal() {
+            document.getElementById('event-modal').classList.add('hidden');
+        }
+
         async function confirmCheckIn(subject = "Check-In", note = null) {
             setLoading(true, `Logging ${subject}...`);
             const now = new Date();
@@ -353,6 +503,7 @@
                 document.getElementById('nametag-to-print').innerHTML = finalTagHTML;
                 
                 showStage('stage-success');
+                renderUpcomingEventsRSVP();
                 
                 // RESTORED: Generate Events QR Code on Success
                 const eventContainer = document.getElementById("qrcode-events");
@@ -397,5 +548,15 @@
             new QRCode(container, { text: WAIVER_URL, width: 250, height: 250 });
         }
     </script>
+
+    <!-- Event QR Modal -->
+    <div id="event-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center z-50 no-print">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 text-center">
+            <h3 id="event-modal-title" class="text-xl font-bold text-slate-800 mb-2">Event Registration</h3>
+            <p id="event-modal-subtitle" class="text-slate-500 mb-6 text-sm">Scan the QR code to register on your phone.</p>
+            <div id="qrcode-event-modal" class="mb-6 flex justify-center bg-white p-4 rounded-xl border border-slate-100 inline-block mx-auto"></div>
+            <button onclick="closeEventModal()" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-lg transition-colors">Close</button>
+        </div>
+    </div>
 </body>
 </html>
