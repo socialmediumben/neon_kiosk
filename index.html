@@ -130,9 +130,9 @@
                 if (response.ok) {
                     const data = await response.json();
                     console.log("Loaded events data:", data);
-                    const events = data.searchResults || data || [];
+                    const events = data.events || data.searchResults || (Array.isArray(data) ? data : []);
                     const todayStr = new Date().toISOString().split('T')[0];
-                    upcomingEvents = (Array.isArray(events) ? events : [])
+                    upcomingEvents = events
                         .filter(e => !e.archived && e.startDate >= todayStr)
                         .sort((a, b) => a.startDate.localeCompare(b.startDate))
                         .slice(0, 3);
