@@ -70,6 +70,9 @@
                     </div>
                     <p class="text-xl text-gray-600 mb-6" id="success-msg"></p>
                     <div id="nametag-final-preview"></div>
+                    <div id="link-card-container" class="mt-6 bg-slate-50 p-6 rounded-2xl border border-slate-200 no-print hidden">
+                        <!-- Loaded dynamically -->
+                    </div>
 
                     <div class="mt-8 bg-slate-50 p-6 rounded-2xl border border-slate-200 no-print">
                         <p class="font-bold text-slate-800 mb-4 text-xl">Attending a Club Today? (Optional)</p>
@@ -107,7 +110,7 @@
             <div class="spinner"></div>
             <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
         </div>
-        <p class="text-xs text-gray-300 mt-6 text-center no-print">v3.1</p>
+        <p class="text-xs text-gray-300 mt-6 text-center no-print">v3.2</p>
     </div>
 
     <div id="nametag-to-print" class="hidden"></div>
@@ -546,6 +549,133 @@
             document.getElementById('event-modal').classList.add('hidden');
         }
 
+        let isLinkingCard = false;
+        let linkedCardBuffer = "";
+        let cardListeningTimeout = null;
+
+        function renderLinkCardControls() {
+            const container = document.getElementById('link-card-container');
+            if (!container) return;
+
+            const membership = currentAccount.accountCurrentMembershipStatus || "None";
+            const isMember = membership.toLowerCase() === 'active';
+
+            if (!isMember) {
+                container.classList.add('hidden');
+                return;
+            }
+
+            container.classList.remove('hidden');
+
+            const customFields = currentAccount.accountCustomFields || [];
+            const tapCardField = customFields.find(cf => cf.id === "114");
+            const existingCardNo = tapCardField ? tapCardField.value : null;
+
+            if (existingCardNo && existingCardNo.trim() !== "") {
+                container.innerHTML = `
+                    <div class="flex items-center justify-between text-left">
+                        <div>
+                            <span class="text-slate-500 font-semibold text-sm">Linked Card</span>
+                            <div class="text-slate-800 font-mono font-bold text-lg">${existingCardNo}</div>
+                        </div>
+                        <button id="btn-link-card" onclick="startCardListening()" class="py-2 px-5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl font-bold text-sm transition-colors">Update Tap Card</button>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="flex items-center justify-between text-left">
+                        <div>
+                            <span class="text-slate-500 font-semibold text-sm">Tap Card</span>
+                            <div class="text-slate-400 text-sm">No card linked yet</div>
+                        </div>
+                        <button id="btn-link-card" onclick="startCardListening()" class="py-2 px-5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl font-bold text-sm transition-colors shadow-sm">Link Tap Card</button>
+                    </div>
+                `;
+            }
+        }
+
+        function startCardListening() {
+            isLinkingCard = true;
+            linkedCardBuffer = "";
+            
+            const btn = document.getElementById('btn-link-card');
+            if (btn) {
+                btn.disabled = true;
+                btn.className = "py-2 px-5 bg-amber-100 text-amber-800 border border-amber-200 rounded-xl font-bold text-sm cursor-default animate-pulse";
+                btn.textContent = "Listening... Tap card now!";
+            }
+
+            if (cardListeningTimeout) clearTimeout(cardListeningTimeout);
+            cardListeningTimeout = setTimeout(() => {
+                cancelCardListening();
+            }, 15000);
+        }
+
+        function cancelCardListening() {
+            isLinkingCard = false;
+            linkedCardBuffer = "";
+            renderLinkCardControls();
+        }
+
+        async function saveLinkedCard(cardNo) {
+            isLinkingCard = false;
+            if (cardListeningTimeout) clearTimeout(cardListeningTimeout);
+
+            const btn = document.getElementById('btn-link-card');
+            if (btn) {
+                btn.textContent = "Saving...";
+                btn.className = "py-2 px-5 bg-slate-200 text-slate-500 rounded-xl font-bold text-sm cursor-default";
+            }
+
+            const payload = {
+                individualAccount: {
+                    accountCustomFields: [
+                        {
+                            id: "114",
+                            value: cardNo
+                        }
+                    ]
+                }
+            };
+
+            try {
+                const response = await fetch(`${API_PROXY_URL}/api/v2/accounts/${currentAccount.accountId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) throw new Error("Failed to save card");
+
+                // Update current account record cache locally
+                if (!currentAccount.accountCustomFields) currentAccount.accountCustomFields = [];
+                const fieldIndex = currentAccount.accountCustomFields.findIndex(cf => cf.id === "114");
+                if (fieldIndex !== -1) {
+                    currentAccount.accountCustomFields[fieldIndex].value = cardNo;
+                } else {
+                    currentAccount.accountCustomFields.push({ id: "114", name: "Tap Card", value: cardNo });
+                }
+
+                if (btn) {
+                    btn.textContent = "✅ Saved!";
+                    btn.className = "py-2 px-5 bg-green-100 text-green-800 rounded-xl font-bold text-sm cursor-default";
+                }
+                
+                setTimeout(() => {
+                    renderLinkCardControls();
+                }, 2000);
+            } catch (e) {
+                console.error("Save card error:", e);
+                if (btn) {
+                    btn.textContent = "❌ Error";
+                    btn.className = "py-2 px-5 bg-red-100 text-red-800 rounded-xl font-bold text-sm cursor-default";
+                }
+                setTimeout(() => {
+                    renderLinkCardControls();
+                }, 3000);
+            }
+        }
+
         async function confirmCheckIn(subject = "Check-In", note = null) {
             setLoading(true, `Logging ${subject}...`);
             const now = new Date();
@@ -579,6 +709,7 @@
                 
                 showStage('stage-success');
                 renderUpcomingEventsRSVP();
+                renderLinkCardControls();
                 
                 // RESTORED: Generate Events QR Code on Success
                 const eventContainer = document.getElementById("qrcode-events");
@@ -623,8 +754,26 @@
             new QRCode(container, { text: WAIVER_URL, width: 250, height: 250 });
         }
 
-        // Global listener to capture card reader inputs even if search box isn't focused
+        // Global listener to capture card reader inputs globally
         document.addEventListener('keydown', (e) => {
+            if (isLinkingCard) {
+                // Intercept keys if we are actively linking a card
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (e.key === 'Enter') {
+                    const cardNo = linkedCardBuffer.trim();
+                    if (cardNo) {
+                        saveLinkedCard(cardNo);
+                    } else {
+                        cancelCardListening();
+                    }
+                } else if (e.key.length === 1) {
+                    linkedCardBuffer += e.key;
+                }
+                return;
+            }
+
             const searchInput = document.getElementById('search-input');
             const searchStage = document.getElementById('stage-search');
             
