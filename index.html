@@ -228,18 +228,50 @@
             const waiver = (currentAccount.accountCustomFields || []).find(f => f.id === WAIVER_FIELD_ID);
             const isSigned = (waiver && waiver.value && waiver.value.trim() !== "") || (waiver && waiver.optionValues && waiver.optionValues.length > 0);
 
-            if (isSigned) {
+            const membership = currentAccount.accountCurrentMembershipStatus || "None";
+            const isMember = membership.toLowerCase() === 'active';
+
+            if (isSigned && isMember) {
                 confirmCheckIn('Check-In');
                 return;
             }
 
             preview.innerHTML = generateNametagHTML();
-            actions.innerHTML = `<div class="bg-red-50 text-red-700 p-6 rounded-xl max-w-md mx-auto"><div id="qrcode-confirm" class="mb-6 flex justify-center bg-white p-4 rounded-lg inline-block mx-auto"></div><br><a href="${WAIVER_URL}" target="_blank" class="font-bold underline text-2xl">Sign Waiver</a></div>`;
-            setTimeout(() => {
-                new QRCode(document.getElementById("qrcode-confirm"), { text: WAIVER_URL, width: 200, height: 200 });
-            }, 50);
+
+            if (!isSigned) {
+                actions.innerHTML = `<div class="bg-red-50 text-red-700 p-6 rounded-xl max-w-md mx-auto"><div id="qrcode-confirm" class="mb-6 flex justify-center bg-white p-4 rounded-lg inline-block mx-auto"></div><br><a href="${WAIVER_URL}" target="_blank" class="font-bold underline text-2xl">Sign Waiver</a></div>`;
+                setTimeout(() => {
+                    new QRCode(document.getElementById("qrcode-confirm"), { text: WAIVER_URL, width: 200, height: 200 });
+                }, 50);
+            } else {
+                const dayPassUrl = "https://socialmedium.app.neoncrm.com/np/clients/socialmedium/product.jsp?product=3&";
+                actions.innerHTML = `
+                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 max-w-md mx-auto text-left">
+                        <div class="mb-6 flex flex-col items-center">
+                            <div id="qrcode-daypass" class="bg-white p-3 rounded-lg border border-slate-200 mb-2"></div>
+                            <a href="${dayPassUrl}" target="_blank" class="text-cyan-600 font-bold underline text-lg">Purchase a Day Pass</a>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label for="host-input" class="block font-bold text-slate-700 mb-2 text-lg">Are you a "+1"? Who is your host?</label>
+                            <input type="text" id="host-input" class="w-full p-3 border border-slate-300 rounded-xl outline-none focus:border-cyan-500 text-lg" placeholder="Host's Full Name (if applicable)">
+                        </div>
+                        
+                        <button onclick="handleNonMemberCheckIn()" class="w-full py-4 bg-cyan-600 text-white rounded-2xl text-xl font-bold hover:bg-cyan-700 shadow-md">Confirm Check-In</button>
+                    </div>
+                `;
+                setTimeout(() => {
+                    new QRCode(document.getElementById("qrcode-daypass"), { text: dayPassUrl, width: 150, height: 150 });
+                }, 50);
+            }
             
             showStage('stage-confirm');
+        }
+
+        function handleNonMemberCheckIn() {
+            const hostInput = document.getElementById('host-input');
+            const hostName = hostInput ? hostInput.value.trim() : "";
+            confirmCheckIn('Check-In', hostName);
         }
 
         async function logExtraClub(subject, btn) {
@@ -288,7 +320,7 @@
             }
         }
 
-        async function confirmCheckIn(subject = "Check-In") {
+        async function confirmCheckIn(subject = "Check-In", note = null) {
             setLoading(true, `Logging ${subject}...`);
             const now = new Date();
             const dateOptions = { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' };
@@ -304,6 +336,10 @@
                 "status": { "id": "4" },
                 "priority": "Low"
             };
+
+            if (note) {
+                payload.note = note;
+            }
 
             try {
                 const response = await fetch(`${API_PROXY_URL}/api/v2/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
