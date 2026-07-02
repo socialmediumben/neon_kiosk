@@ -85,7 +85,7 @@
                     <div class="mt-6 bg-slate-50 p-6 rounded-2xl border border-slate-200 no-print">
                         <p class="font-bold text-slate-800 mb-4 text-xl">RSVP for Upcoming Events (Optional)</p>
                         <div id="upcoming-events-list" class="space-y-3">
-                            <!-- Loaded dynamically -->
+                            <p class="text-gray-400 text-sm">Loading upcoming events...</p>
                         </div>
                     </div>
                 </div>
@@ -121,21 +121,34 @@
         const EVENTS_URL = "https://socialmedium.app.neoncrm.com/np/constituent/eventList.do?orgId=socialmedium";
         let currentAccount = null;
         let upcomingEvents = [];
+        let eventsLoaded = false;
 
         async function loadUpcomingEvents() {
             try {
+                console.log("Loading upcoming events...");
                 const response = await fetch(`${API_PROXY_URL}/api/v2/events`);
                 if (response.ok) {
                     const data = await response.json();
+                    console.log("Loaded events data:", data);
                     const events = data.searchResults || data || [];
                     const todayStr = new Date().toISOString().split('T')[0];
-                    upcomingEvents = events
+                    upcomingEvents = (Array.isArray(events) ? events : [])
                         .filter(e => !e.archived && e.startDate >= todayStr)
                         .sort((a, b) => a.startDate.localeCompare(b.startDate))
                         .slice(0, 3);
+                    console.log("Filtered upcoming events:", upcomingEvents);
+                } else {
+                    console.error("Failed to load events, status:", response.status);
                 }
             } catch (e) {
                 console.error("Error loading events:", e);
+            } finally {
+                eventsLoaded = true;
+                const successStage = document.getElementById('stage-success');
+                if (successStage && successStage.classList.contains('active-stage')) {
+                    console.log("Success screen active, rendering events post-load");
+                    renderUpcomingEventsRSVP();
+                }
             }
         }
         loadUpcomingEvents();
@@ -351,7 +364,11 @@
             const container = document.getElementById('upcoming-events-list');
             if (!container) return;
             if (upcomingEvents.length === 0) {
-                container.innerHTML = `<p class="text-gray-500 text-sm">No upcoming events found.</p>`;
+                if (!eventsLoaded) {
+                    container.innerHTML = `<p class="text-gray-400 text-sm">Loading upcoming events...</p>`;
+                } else {
+                    container.innerHTML = `<p class="text-gray-500 text-sm">No upcoming events found.</p>`;
+                }
                 return;
             }
 
