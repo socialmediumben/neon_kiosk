@@ -32,8 +32,8 @@
         
         <div id="stage-search" class="stage active-stage">
             <h1 class="text-4xl font-extrabold text-gray-800 mb-2">Check-In</h1>
-            <p class="text-gray-500 mb-8">Enter your Account ID or Last Name.</p>
-            <input type="text" id="search-input" autocomplete="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter') handleSearch()" class="w-full max-w-lg p-5 text-3xl border-2 border-gray-100 rounded-2xl mb-6 text-center focus:border-cyan-500 outline-none transition-all mx-auto block" placeholder="ID or Last Name">
+            <p class="text-gray-500 mb-8">Tap your Card or Enter ID/Last Name.</p>
+            <input type="text" id="search-input" autocomplete="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter') handleSearch()" class="w-full max-w-lg p-5 text-3xl border-2 border-gray-100 rounded-2xl mb-6 text-center focus:border-cyan-500 outline-none transition-all mx-auto block" placeholder="Scan Card or Enter Name/ID">
             <button onclick="handleSearch()" class="w-full max-w-lg py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold hover:bg-cyan-700 shadow-lg mb-6 mx-auto block">Search</button>
             <div class="border-t border-gray-100 pt-6">
                 <button onclick="showWaiverOnly()" class="w-full max-w-lg py-4 bg-emerald-600 text-white rounded-2xl text-xl font-bold shadow-md mx-auto block">Sign the Waiver</button>
@@ -107,7 +107,7 @@
             <div class="spinner"></div>
             <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
         </div>
-        <p class="text-xs text-gray-300 mt-6 text-center no-print">v3.0</p>
+        <p class="text-xs text-gray-300 mt-6 text-center no-print">v3.1</p>
     </div>
 
     <div id="nametag-to-print" class="hidden"></div>
@@ -156,18 +156,90 @@
 
         async function handleSearch() {
             const input = document.getElementById('search-input').value.trim();
-            if (!input) return alert("Please enter an ID or Last Name.");
+            if (!input) return alert("Please enter an ID, Last Name, or Tap Card.");
             setLoading(true, "Searching...");
             try {
-                if (/^\d+$/.test(input)) {
-                    await fetchAccountById(input);
-                } else {
-                    await searchAccountsByName(input);
-                }
+                await performUnifiedSearch(input);
             } catch (e) {
                 alert("Error: " + e.message);
             } finally {
                 setLoading(false);
+            }
+        }
+
+        async function performUnifiedSearch(input) {
+            // 1. Try searching by Tap Card custom field (ID 114)
+            let accounts = await searchByTapCard(input);
+            if (accounts.length > 0) {
+                await handleSearchResults(accounts);
+                return;
+            }
+
+            // 2. If input is purely numeric, try fetching directly by Account ID
+            if (/^\d+$/.test(input)) {
+                try {
+                    await fetchAccountById(input);
+                    return;
+                } catch (e) {
+                    // Fallback to name search if account ID fetch fails
+                }
+            }
+
+            // 3. Fallback to searching by Last Name
+            accounts = await searchByName(input);
+            if (accounts.length > 0) {
+                await handleSearchResults(accounts);
+                return;
+            }
+
+            throw new Error("No accounts found.");
+        }
+
+        async function searchByTapCard(tapCardNo) {
+            const payload = {
+                "searchFields": [{ "field": "Tap Card", "operator": "EQUAL", "value": tapCardNo }],
+                "outputFields": ["First Name", "Last Name", "Preferred Name", "Account ID"],
+                "pagination": { "currentPage": 0, "pageSize": 10 }
+            };
+            try {
+                const response = await fetch(`${API_PROXY_URL}/api/v2/accounts/search`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) return [];
+                const data = await response.json();
+                return data.searchResults || [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        async function searchByName(lastName) {
+            const payload = {
+                "searchFields": [{ "field": "Last Name", "operator": "EQUAL", "value": lastName }],
+                "outputFields": ["First Name", "Last Name", "Preferred Name", "Account ID"],
+                "pagination": { "currentPage": 0, "pageSize": 50 }
+            };
+            try {
+                const response = await fetch(`${API_PROXY_URL}/api/v2/accounts/search`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) return [];
+                const data = await response.json();
+                return data.searchResults || [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        async function handleSearchResults(accounts) {
+            if (accounts.length === 1) {
+                await fetchAccountById(accounts[0]["Account ID"] || accounts[0].accountId);
+            } else {
+                renderResultsList(accounts);
             }
         }
 
@@ -187,27 +259,6 @@
                 document.body.style.backgroundColor = '#3BC0CD';
             } else {
                 document.body.style.backgroundColor = '#F16622FF';
-            }
-        }
-
-        async function searchAccountsByName(lastName) {
-            const payload = {
-                "searchFields": [{ "field": "Last Name", "operator": "EQUAL", "value": lastName }],
-                "outputFields": ["First Name", "Last Name", "Preferred Name", "Account ID"],
-                "pagination": { "currentPage": 0, "pageSize": 50 }
-            };
-            const response = await fetch(`${API_PROXY_URL}/api/v2/accounts/search`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await response.json();
-            const accounts = data.searchResults || [];
-            if (accounts.length === 0) throw new Error("No accounts found.");
-            if (accounts.length === 1) {
-                await fetchAccountById(accounts[0]["Account ID"] || accounts[0].accountId);
-            } else {
-                renderResultsList(accounts);
             }
         }
 
@@ -571,6 +622,20 @@
             container.innerHTML = "";
             new QRCode(container, { text: WAIVER_URL, width: 250, height: 250 });
         }
+
+        // Global listener to capture card reader inputs even if search box isn't focused
+        document.addEventListener('keydown', (e) => {
+            const searchInput = document.getElementById('search-input');
+            const searchStage = document.getElementById('stage-search');
+            
+            // Only capture if we are on the search stage
+            if (searchStage && searchStage.classList.contains('active-stage')) {
+                // If focus is not already on searchInput, and it's a printable character
+                if (document.activeElement !== searchInput && e.key.length === 1) {
+                    searchInput.focus();
+                }
+            }
+        });
     </script>
 
     <!-- Event QR Modal -->
