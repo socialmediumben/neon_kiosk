@@ -271,7 +271,8 @@
         function handleNonMemberCheckIn() {
             const hostInput = document.getElementById('host-input');
             const hostName = hostInput ? hostInput.value.trim() : "";
-            confirmCheckIn('Check-In', hostName);
+            const note = hostName ? `Hosted by: ${hostName}` : null;
+            confirmCheckIn('Check-In', note);
         }
 
         async function logExtraClub(subject, btn) {
