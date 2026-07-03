@@ -28,7 +28,7 @@
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4 text-center">
 
-    <div id="main-container" class="w-full max-w-5xl bg-white p-10 rounded-3xl shadow-2xl no-print">
+    <div id="main-container" class="w-full max-w-6xl bg-white p-10 rounded-3xl shadow-2xl no-print">
         
         <div id="stage-search" class="stage active-stage">
             <h1 class="text-4xl font-extrabold text-gray-800 mb-2">Check-In</h1>
@@ -62,19 +62,22 @@
         </div>
 
         <div id="stage-success" class="stage">
-            <div class="flex items-start justify-between w-full">
-                <div class="flex-1 text-left">
-                    <div class="flex items-center space-x-3 mb-2 text-green-600">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full items-start">
+                <!-- Left Column -->
+                <div class="text-left space-y-6">
+                    <div class="flex items-center space-x-3 text-green-600">
                         <span class="text-4xl">✅</span>
                         <h1 class="text-4xl font-bold">Success!</h1>
                     </div>
-                    <p class="text-xl text-gray-600 mb-6" id="success-msg"></p>
+                    <p class="text-xl text-gray-600" id="success-msg"></p>
+                    
                     <div id="nametag-final-preview"></div>
-                    <div id="link-card-container" class="mt-6 bg-slate-50 p-6 rounded-2xl border border-slate-200 no-print hidden">
+                    
+                    <div id="link-card-container" class="bg-slate-50 p-6 rounded-2xl border border-slate-200 no-print hidden">
                         <!-- Loaded dynamically -->
                     </div>
 
-                    <div class="mt-8 bg-slate-50 p-6 rounded-2xl border border-slate-200 no-print">
+                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 no-print">
                         <p class="font-bold text-slate-800 mb-4 text-xl">Attending a Club Today? (Optional)</p>
                         <div class="grid grid-cols-2 gap-3">
                             <button onclick="logExtraClub('Cosplay Club Check-In', this)" class="py-3 bg-cyan-100 text-cyan-800 rounded-xl font-bold hover:bg-cyan-200 border border-cyan-300 transition-colors">Cosplay Club</button>
@@ -84,19 +87,14 @@
                             <button onclick="logExtraClub('Creative Teens Club Check-In', this)" class="col-span-2 py-3 bg-cyan-100 text-cyan-800 rounded-xl font-bold hover:bg-cyan-200 border border-cyan-300 transition-colors">Creative Teens Club Check-In</button>
                         </div>
                     </div>
-
-                    <div class="mt-6 bg-slate-50 p-6 rounded-2xl border border-slate-200 no-print">
-                        <p class="font-bold text-slate-800 mb-4 text-xl">RSVP for Upcoming Events (Optional)</p>
-                        <div id="upcoming-events-list" class="space-y-3">
-                            <p class="text-gray-400 text-sm">Loading upcoming events...</p>
-                        </div>
-                    </div>
                 </div>
 
-                <div class="ml-10 bg-cyan-50 p-6 rounded-3xl border border-cyan-100 text-center">
-                    <p class="text-cyan-800 font-bold mb-4">Upcoming Events</p>
-                    <div id="qrcode-events" class="mb-4 flex justify-center bg-white p-4 rounded-2xl"></div>
-                    <p class="text-xs text-cyan-600 max-w-[150px] mx-auto">Scan to view our event calendar!</p>
+                <!-- Right Column -->
+                <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 no-print text-left self-stretch flex flex-col h-full">
+                    <p class="font-bold text-slate-800 mb-4 text-xl">RSVP for Upcoming Events (Optional)</p>
+                    <div id="upcoming-events-list" class="space-y-3 overflow-y-auto flex-1 max-h-[600px] pr-1">
+                        <p class="text-gray-400 text-sm">Loading upcoming events...</p>
+                    </div>
                 </div>
             </div>
 
@@ -110,7 +108,7 @@
             <div class="spinner"></div>
             <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
         </div>
-        <p class="text-xs text-gray-300 mt-6 text-center no-print">v3.2</p>
+        <p class="text-xs text-gray-300 mt-6 text-center no-print">v3.3</p>
     </div>
 
     <div id="nametag-to-print" class="hidden"></div>
@@ -139,7 +137,7 @@
                     upcomingEvents = events
                         .filter(e => !e.archived && e.startDate >= todayStr)
                         .sort((a, b) => a.startDate.localeCompare(b.startDate))
-                        .slice(0, 3);
+                        .slice(0, 10);
                     console.log("Filtered upcoming events:", upcomingEvents);
                 } else {
                     console.error("Failed to load events, status:", response.status);
@@ -710,11 +708,6 @@
                 showStage('stage-success');
                 renderUpcomingEventsRSVP();
                 renderLinkCardControls();
-                
-                // RESTORED: Generate Events QR Code on Success
-                const eventContainer = document.getElementById("qrcode-events");
-                eventContainer.innerHTML = "";
-                new QRCode(eventContainer, { text: EVENTS_URL, width: 180, height: 180 });
                 
                 startResetTimer();
             } catch (e) {
