@@ -28,7 +28,7 @@
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4 text-center">
 
-    <div id="main-container" class="w-full max-w-6xl bg-white p-10 rounded-3xl shadow-2xl no-print">
+    <div id="main-container" class="w-full max-w-[1350px] bg-white p-10 rounded-3xl shadow-2xl no-print">
         
         <div id="stage-search" class="stage active-stage">
             <h1 class="text-4xl font-extrabold text-gray-800 mb-2">Check-In</h1>
@@ -62,7 +62,7 @@
         </div>
 
         <div id="stage-success" class="stage">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full items-start">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full items-stretch">
                 <!-- Left Column -->
                 <div class="text-left space-y-6">
                     <div class="flex items-center space-x-3 text-green-600">
@@ -92,7 +92,7 @@
                 <!-- Right Column -->
                 <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 no-print text-left self-stretch flex flex-col h-full">
                     <p class="font-bold text-slate-800 mb-4 text-xl">RSVP for Upcoming Events (Optional)</p>
-                    <div id="upcoming-events-list" class="space-y-3 overflow-y-auto flex-1 max-h-[600px] pr-1">
+                    <div id="upcoming-events-list" class="space-y-3 overflow-y-auto flex-1 max-h-[700px] pr-1">
                         <p class="text-gray-400 text-sm">Loading upcoming events...</p>
                     </div>
                 </div>
@@ -108,7 +108,7 @@
             <div class="spinner"></div>
             <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
         </div>
-        <p class="text-xs text-gray-300 mt-6 text-center no-print">v3.3</p>
+        <p class="text-xs text-gray-300 mt-6 text-center no-print">v3.4</p>
     </div>
 
     <div id="nametag-to-print" class="hidden"></div>
