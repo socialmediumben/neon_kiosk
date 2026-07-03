@@ -100,7 +100,7 @@
 
             <div class="flex space-x-4 mt-8 no-print">
                 <button onclick="window.print()" class="flex-1 py-5 bg-blue-600 text-white rounded-2xl text-2xl font-bold shadow-lg hover:bg-blue-700">Print Nametag</button>
-                <button onclick="location.reload()" class="flex-1 py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold hover:bg-cyan-700">Next Person <span id="timer">(30)</span></button>
+                <button onclick="location.reload()" class="flex-1 py-5 bg-cyan-600 text-white rounded-2xl text-2xl font-bold hover:bg-cyan-700">Next Person <span id="timer">(120)</span></button>
             </div>
         </div>
 
@@ -108,7 +108,7 @@
             <div class="spinner"></div>
             <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
         </div>
-        <p class="text-xs text-gray-300 mt-6 text-center no-print">v3.5</p>
+        <p class="text-xs text-gray-300 mt-6 text-center no-print">v3.6</p>
     </div>
 
     <div id="nametag-to-print" class="hidden"></div>
@@ -718,7 +718,7 @@
         }
 
         function startResetTimer() {
-            let timeLeft = 30;
+            let timeLeft = 120;
             const timerEl = document.getElementById('timer');
             const interval = setInterval(() => {
                 timeLeft--;
