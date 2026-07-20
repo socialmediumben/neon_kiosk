@@ -108,7 +108,7 @@
             <div class="spinner"></div>
             <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
         </div>
-        <p class="text-xs text-gray-300 mt-6 text-center no-print">v3.7</p>
+        <p class="text-xs text-gray-300 mt-6 text-center no-print">v3.8</p>
     </div>
 
     <div id="nametag-to-print" class="hidden"></div>
@@ -151,7 +151,8 @@
                     const data = await response.json();
                     console.log("Loaded events data:", data);
                     const events = data.events || data.searchResults || (Array.isArray(data) ? data : []);
-                    const todayStr = new Date().toISOString().split('T')[0];
+                    const todayParts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+                    const todayStr = `${todayParts.find(p => p.type === 'year').value}-${todayParts.find(p => p.type === 'month').value}-${todayParts.find(p => p.type === 'day').value}`;
                     upcomingEvents = events
                         .filter(e => !e.archived && e.startDate >= todayStr)
                         .sort((a, b) => a.startDate.localeCompare(b.startDate))
