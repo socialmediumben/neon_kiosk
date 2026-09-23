@@ -108,7 +108,7 @@
             <div class="spinner"></div>
             <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
         </div>
-        <p class="text-xs text-gray-300 mt-6 text-center no-print">v3.9</p>
+        <p class="text-xs text-gray-300 mt-6 text-center no-print">v4.0</p>
     </div>
 
     <div id="nametag-to-print" class="hidden"></div>
@@ -750,6 +750,37 @@
             }
         }
 
+        function getTodayKeyPT() {
+            const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+            return `${parts.find(p => p.type === 'year').value}-${parts.find(p => p.type === 'month').value}-${parts.find(p => p.type === 'day').value}`;
+        }
+
+        function hasCheckedInToday(accountId) {
+            const todayKey = getTodayKeyPT();
+            const stored = localStorage.getItem('checkins_' + todayKey);
+            if (!stored) return false;
+            const ids = JSON.parse(stored);
+            return ids.includes(String(accountId));
+        }
+
+        function markCheckedInToday(accountId) {
+            const todayKey = getTodayKeyPT();
+            const stored = localStorage.getItem('checkins_' + todayKey);
+            const ids = stored ? JSON.parse(stored) : [];
+            if (!ids.includes(String(accountId))) {
+                ids.push(String(accountId));
+            }
+            localStorage.setItem('checkins_' + todayKey, JSON.stringify(ids));
+
+            // Clean up old days
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('checkins_') && key !== 'checkins_' + todayKey) {
+                    localStorage.removeItem(key);
+                }
+            }
+        }
+
         async function confirmCheckIn(subject = "Check-In", note = null) {
             setLoading(true, `Logging ${subject}...`);
             const now = new Date();
@@ -758,24 +789,37 @@
             const d = `${parts.find(p => p.type === 'year').value}-${parts.find(p => p.type === 'month').value}-${parts.find(p => p.type === 'day').value}`;
             const t = now.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true });
 
-            const payload = {
-                "subject": subject,
-                "activityDates": { "startDate": d, "startTime": t, "timeZone": { "id": "82" } },
-                "clientAccount": [{ "accountId": String(currentAccount.accountId) }],
-                "systemUserId": [ String(SYSTEM_USER_ID) ],
-                "status": { "id": "4" },
-                "priority": "Low"
-            };
-
-            if (note) {
-                payload.note = note;
-            }
+            const alreadyCheckedIn = (subject === "Check-In") && hasCheckedInToday(currentAccount.accountId);
 
             try {
-                const response = await fetch(`${API_PROXY_URL}/api/v2/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if (!response.ok) throw new Error("Check-in failed");
+                if (alreadyCheckedIn) {
+                    console.log("Skipping duplicate Check-In for account", currentAccount.accountId, "- already checked in today");
+                } else {
+                    const payload = {
+                        "subject": subject,
+                        "activityDates": { "startDate": d, "startTime": t, "timeZone": { "id": "82" } },
+                        "clientAccount": [{ "accountId": String(currentAccount.accountId) }],
+                        "systemUserId": [ String(SYSTEM_USER_ID) ],
+                        "status": { "id": "4" },
+                        "priority": "Low"
+                    };
+
+                    if (note) {
+                        payload.note = note;
+                    }
+
+                    const response = await fetch(`${API_PROXY_URL}/api/v2/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error("Check-in failed");
+
+                    if (subject === "Check-In") {
+                        markCheckedInToday(currentAccount.accountId);
+                    }
+                }
                 
-                document.getElementById('success-msg').textContent = `${currentAccount.primaryContact.firstName} successfully logged: ${subject}`;
+                const statusText = alreadyCheckedIn 
+                    ? `Welcome back, ${currentAccount.primaryContact.firstName}!`
+                    : `${currentAccount.primaryContact.firstName} successfully logged: ${subject}`;
+                document.getElementById('success-msg').textContent = statusText;
                 
                 const finalTagHTML = generateNametagHTML();
                 document.getElementById('nametag-final-preview').innerHTML = finalTagHTML;
