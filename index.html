@@ -749,10 +749,10 @@
             const container = document.getElementById('link-card-container');
             if (!container) return;
 
-            const membership = currentAccount.accountCurrentMembershipStatus || "None";
-            const isMember = membership.toLowerCase() === 'active';
+            const waiver = (currentAccount.accountCustomFields || []).find(f => f.id === WAIVER_FIELD_ID);
+            const isSigned = (waiver && waiver.value && waiver.value.trim() !== "") || (waiver && waiver.optionValues && waiver.optionValues.length > 0);
 
-            if (!isMember) {
+            if (!isSigned) {
                 container.classList.add('hidden');
                 return;
             }
