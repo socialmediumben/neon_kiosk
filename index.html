@@ -84,7 +84,7 @@
                             <button onclick="logExtraClub('Electronics Club Check-In', this)" class="py-3 bg-cyan-100 text-cyan-800 rounded-xl font-bold hover:bg-cyan-200 border border-cyan-300 transition-colors">Electronics Club</button>
                             <button onclick="logExtraClub('TTRPG Club Check-In', this)" class="py-3 bg-cyan-100 text-cyan-800 rounded-xl font-bold hover:bg-cyan-200 border border-cyan-300 transition-colors">TTRPG Club</button>
                             <button onclick="logExtraClub('Process Art Club Check-In', this)" class="py-3 bg-cyan-100 text-cyan-800 rounded-xl font-bold hover:bg-cyan-200 border border-cyan-300 transition-colors">Process Art Club</button>
-                            <button onclick="logExtraClub('Creative Teens Club Check-In', this)" class="col-span-2 py-3 bg-cyan-100 text-cyan-800 rounded-xl font-bold hover:bg-cyan-200 border border-cyan-300 transition-colors">Creative Teens Club Check-In</button>
+                            <button id="btn-creative-teens" class="col-span-2 py-3 rounded-xl font-bold transition-colors">Creative Teens Club</button>
                         </div>
                     </div>
                 </div>
@@ -108,7 +108,7 @@
             <div class="spinner"></div>
             <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
         </div>
-        <p class="text-xs text-gray-300 mt-6 text-center no-print">v4.0</p>
+        <p class="text-xs text-gray-300 mt-6 text-center no-print">v4.1</p>
     </div>
 
     <div id="nametag-to-print" class="hidden"></div>
@@ -397,11 +397,58 @@
             confirmCheckIn('Check-In', note);
         }
 
+        function hasCreativeTeensCheckedIn(accountId) {
+            const todayKey = getTodayKeyPT();
+            const stored = localStorage.getItem('ct_checkins_' + todayKey);
+            if (!stored) return false;
+            const ids = JSON.parse(stored);
+            return ids.includes(String(accountId));
+        }
+
+        function markCreativeTeensCheckedIn(accountId) {
+            const todayKey = getTodayKeyPT();
+            const stored = localStorage.getItem('ct_checkins_' + todayKey);
+            const ids = stored ? JSON.parse(stored) : [];
+            if (!ids.includes(String(accountId))) {
+                ids.push(String(accountId));
+            }
+            localStorage.setItem('ct_checkins_' + todayKey, JSON.stringify(ids));
+
+            // Clean up old days
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('ct_checkins_') && key !== 'ct_checkins_' + todayKey) {
+                    localStorage.removeItem(key);
+                }
+            }
+        }
+
+        function renderCreativeTeensButton() {
+            const btn = document.getElementById('btn-creative-teens');
+            if (!btn || !currentAccount) return;
+
+            const alreadyIn = hasCreativeTeensCheckedIn(currentAccount.accountId);
+
+            if (alreadyIn) {
+                btn.textContent = "Creative Teens Club Check-Out";
+                btn.className = "col-span-2 py-3 bg-amber-100 text-amber-800 rounded-xl font-bold hover:bg-amber-200 border border-amber-300 transition-colors";
+                btn.onclick = function() { logExtraClub('Creative Teens Club Check-Out', this); };
+            } else {
+                btn.textContent = "Creative Teens Club Check-In";
+                btn.className = "col-span-2 py-3 bg-cyan-100 text-cyan-800 rounded-xl font-bold hover:bg-cyan-200 border border-cyan-300 transition-colors";
+                btn.onclick = function() { logExtraClub('Creative Teens Club Check-In', this); };
+            }
+            btn.disabled = false;
+        }
+
         async function logExtraClub(subject, btn) {
             btn.disabled = true;
             btn.classList.replace('bg-cyan-100', 'bg-slate-200');
+            btn.classList.replace('bg-amber-100', 'bg-slate-200');
             btn.classList.replace('text-cyan-800', 'text-slate-500');
+            btn.classList.replace('text-amber-800', 'text-slate-500');
             btn.classList.replace('hover:bg-cyan-200', 'cursor-default');
+            btn.classList.replace('hover:bg-amber-200', 'cursor-default');
             btn.textContent = "Logging...";
             
             const now = new Date();
@@ -413,6 +460,7 @@
             const statusMap = {
                 "Cosplay Club Check-In": "7",
                 "Creative Teens Club Check-In": "8",
+                "Creative Teens Club Check-Out": "8",
                 "Electronics Club Check-In": "10",
                 "TTRPG Club Check-In": "11",
                 "Process Art Club Check-In": "12"
@@ -434,10 +482,19 @@
 
             try {
                 const response = await fetch(`${API_PROXY_URL}/api/v2/activities`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if (!response.ok) throw new Error("Check-in failed");
+                if (!response.ok) throw new Error("Log failed");
+
+                if (subject === 'Creative Teens Club Check-In') {
+                    markCreativeTeensCheckedIn(currentAccount.accountId);
+                }
+
                 btn.classList.replace('bg-slate-200', 'bg-green-100');
                 btn.classList.replace('text-slate-500', 'text-green-800');
                 btn.textContent = "✅ Logged!";
+
+                if (subject.startsWith('Creative Teens Club')) {
+                    setTimeout(() => renderCreativeTeensButton(), 2000);
+                }
             } catch (e) {
                 btn.textContent = "❌ Error";
             }
@@ -828,6 +885,7 @@
                 showStage('stage-success');
                 renderUpcomingEventsRSVP();
                 renderLinkCardControls();
+                renderCreativeTeensButton();
                 
                 startResetTimer();
             } catch (e) {
