@@ -108,7 +108,7 @@
             <div class="spinner"></div>
             <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
         </div>
-        <p class="text-xs text-gray-300 mt-6 text-center no-print">v3.8</p>
+        <p class="text-xs text-gray-300 mt-6 text-center no-print">v3.9</p>
     </div>
 
     <div id="nametag-to-print" class="hidden"></div>
@@ -128,15 +128,25 @@
 
         async function fetchAccountEventRegistrations(accountId) {
             try {
-                const response = await fetch(`${API_PROXY_URL}/api/v2/accounts/${accountId}/eventRegistrations`);
-                if (response.ok) {
+                let allEventIds = [];
+                let currentPage = 0;
+                let totalPages = 1;
+
+                while (currentPage < totalPages) {
+                    const response = await fetch(`${API_PROXY_URL}/api/v2/accounts/${accountId}/eventRegistrations?currentPage=${currentPage}&pageSize=100`);
+                    if (!response.ok) break;
                     const data = await response.json();
                     const regs = data.eventRegistrations || [];
-                    registeredEventIds = regs.map(r => String(r.eventId));
-                    console.log("Customer's registered event IDs:", registeredEventIds);
-                } else {
-                    registeredEventIds = [];
+                    allEventIds = allEventIds.concat(regs.map(r => String(r.eventId)));
+
+                    if (data.pagination) {
+                        totalPages = data.pagination.totalPages || 1;
+                    }
+                    currentPage++;
                 }
+
+                registeredEventIds = allEventIds;
+                console.log("Customer's registered event IDs:", registeredEventIds);
             } catch (e) {
                 console.error("Error loading account registrations:", e);
                 registeredEventIds = [];
