@@ -108,7 +108,7 @@
             <div class="spinner"></div>
             <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
         </div>
-        <p class="text-xs text-gray-300 mt-6 text-center no-print">v4.1</p>
+        <p class="text-xs text-gray-300 mt-6 text-center no-print">v4.2</p>
     </div>
 
     <div id="nametag-to-print" class="hidden"></div>
@@ -397,29 +397,44 @@
             confirmCheckIn('Check-In', note);
         }
 
-        function hasCreativeTeensCheckedIn(accountId) {
+        function getCreativeTeensData(accountId) {
             const todayKey = getTodayKeyPT();
-            const stored = localStorage.getItem('ct_checkins_' + todayKey);
-            if (!stored) return false;
-            const ids = JSON.parse(stored);
-            return ids.includes(String(accountId));
+            const stored = localStorage.getItem('ct_activity_' + todayKey);
+            if (!stored) return null;
+            const entries = JSON.parse(stored);
+            return entries.find(e => e.accountId === String(accountId)) || null;
         }
 
-        function markCreativeTeensCheckedIn(accountId) {
+        function markCreativeTeensCheckedIn(accountId, activityId) {
             const todayKey = getTodayKeyPT();
-            const stored = localStorage.getItem('ct_checkins_' + todayKey);
-            const ids = stored ? JSON.parse(stored) : [];
-            if (!ids.includes(String(accountId))) {
-                ids.push(String(accountId));
+            const stored = localStorage.getItem('ct_activity_' + todayKey);
+            const entries = stored ? JSON.parse(stored) : [];
+            const existing = entries.find(e => e.accountId === String(accountId));
+            if (existing) {
+                existing.activityId = activityId;
+            } else {
+                entries.push({ accountId: String(accountId), activityId: String(activityId), checkedOut: false });
             }
-            localStorage.setItem('ct_checkins_' + todayKey, JSON.stringify(ids));
+            localStorage.setItem('ct_activity_' + todayKey, JSON.stringify(entries));
 
             // Clean up old days
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
-                if (key && key.startsWith('ct_checkins_') && key !== 'ct_checkins_' + todayKey) {
+                if (key && key.startsWith('ct_activity_') && key !== 'ct_activity_' + todayKey) {
                     localStorage.removeItem(key);
                 }
+            }
+        }
+
+        function markCreativeTeensCheckedOut(accountId) {
+            const todayKey = getTodayKeyPT();
+            const stored = localStorage.getItem('ct_activity_' + todayKey);
+            if (!stored) return;
+            const entries = JSON.parse(stored);
+            const entry = entries.find(e => e.accountId === String(accountId));
+            if (entry) {
+                entry.checkedOut = true;
+                localStorage.setItem('ct_activity_' + todayKey, JSON.stringify(entries));
             }
         }
 
@@ -427,28 +442,74 @@
             const btn = document.getElementById('btn-creative-teens');
             if (!btn || !currentAccount) return;
 
-            const alreadyIn = hasCreativeTeensCheckedIn(currentAccount.accountId);
+            const data = getCreativeTeensData(currentAccount.accountId);
 
-            if (alreadyIn) {
+            if (data && data.checkedOut) {
+                // Already checked in AND out today
+                btn.textContent = "✅ Checked Out";
+                btn.className = "col-span-2 py-3 bg-green-50 text-green-700 border border-green-200 rounded-xl font-bold cursor-default transition-colors";
+                btn.onclick = null;
+                btn.disabled = true;
+            } else if (data && data.activityId) {
+                // Checked in but not out yet
                 btn.textContent = "Creative Teens Club Check-Out";
                 btn.className = "col-span-2 py-3 bg-amber-100 text-amber-800 rounded-xl font-bold hover:bg-amber-200 border border-amber-300 transition-colors";
-                btn.onclick = function() { logExtraClub('Creative Teens Club Check-Out', this); };
+                btn.onclick = function() { handleCreativeTeensCheckOut(this); };
+                btn.disabled = false;
             } else {
+                // Not checked in yet
                 btn.textContent = "Creative Teens Club Check-In";
                 btn.className = "col-span-2 py-3 bg-cyan-100 text-cyan-800 rounded-xl font-bold hover:bg-cyan-200 border border-cyan-300 transition-colors";
                 btn.onclick = function() { logExtraClub('Creative Teens Club Check-In', this); };
+                btn.disabled = false;
             }
-            btn.disabled = false;
+        }
+
+        async function handleCreativeTeensCheckOut(btn) {
+            btn.disabled = true;
+            btn.classList.replace('bg-amber-100', 'bg-slate-200');
+            btn.classList.replace('text-amber-800', 'text-slate-500');
+            btn.classList.replace('hover:bg-amber-200', 'cursor-default');
+            btn.textContent = "Logging Check-Out...";
+
+            const now = new Date();
+            const dateOptions = { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' };
+            const parts = new Intl.DateTimeFormat('en-US', dateOptions).formatToParts(now);
+            const d = `${parts.find(p => p.type === 'year').value}-${parts.find(p => p.type === 'month').value}-${parts.find(p => p.type === 'day').value}`;
+            const t = now.toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true });
+
+            const data = getCreativeTeensData(currentAccount.accountId);
+            if (!data || !data.activityId) {
+                btn.textContent = "❌ Error";
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_PROXY_URL}/api/v2/activities/${data.activityId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ activityDates: { endDate: d, endTime: t } })
+                });
+                if (!response.ok) throw new Error("Check-out failed");
+
+                markCreativeTeensCheckedOut(currentAccount.accountId);
+
+                btn.classList.replace('bg-slate-200', 'bg-green-100');
+                btn.classList.replace('text-slate-500', 'text-green-800');
+                btn.textContent = "✅ Checked Out!";
+
+                setTimeout(() => renderCreativeTeensButton(), 2000);
+            } catch (e) {
+                console.error("Creative Teens Check-Out error:", e);
+                btn.textContent = "❌ Error";
+            }
         }
 
         async function logExtraClub(subject, btn) {
             btn.disabled = true;
             btn.classList.replace('bg-cyan-100', 'bg-slate-200');
-            btn.classList.replace('bg-amber-100', 'bg-slate-200');
             btn.classList.replace('text-cyan-800', 'text-slate-500');
-            btn.classList.replace('text-amber-800', 'text-slate-500');
             btn.classList.replace('hover:bg-cyan-200', 'cursor-default');
-            btn.classList.replace('hover:bg-amber-200', 'cursor-default');
             btn.textContent = "Logging...";
             
             const now = new Date();
@@ -460,7 +521,6 @@
             const statusMap = {
                 "Cosplay Club Check-In": "7",
                 "Creative Teens Club Check-In": "8",
-                "Creative Teens Club Check-Out": "8",
                 "Electronics Club Check-In": "10",
                 "TTRPG Club Check-In": "11",
                 "Process Art Club Check-In": "12"
@@ -485,14 +545,15 @@
                 if (!response.ok) throw new Error("Log failed");
 
                 if (subject === 'Creative Teens Club Check-In') {
-                    markCreativeTeensCheckedIn(currentAccount.accountId);
+                    const result = await response.json();
+                    markCreativeTeensCheckedIn(currentAccount.accountId, result.id);
                 }
 
                 btn.classList.replace('bg-slate-200', 'bg-green-100');
                 btn.classList.replace('text-slate-500', 'text-green-800');
                 btn.textContent = "✅ Logged!";
 
-                if (subject.startsWith('Creative Teens Club')) {
+                if (subject === 'Creative Teens Club Check-In') {
                     setTimeout(() => renderCreativeTeensButton(), 2000);
                 }
             } catch (e) {
