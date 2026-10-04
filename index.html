@@ -108,7 +108,7 @@
             <div class="spinner"></div>
             <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
         </div>
-        <p class="text-xs text-gray-300 mt-6 text-center no-print">v4.2</p>
+        <p class="text-xs text-gray-300 mt-6 text-center no-print">v4.3</p>
     </div>
 
     <div id="nametag-to-print" class="hidden"></div>
@@ -125,6 +125,8 @@
         let upcomingEvents = [];
         let eventsLoaded = false;
         let registeredEventIds = [];
+        const EVENTS_PER_PAGE = 4;
+        let eventsCurrentPage = 1;
 
         async function fetchAccountEventRegistrations(accountId) {
             try {
@@ -156,21 +158,32 @@
         async function loadUpcomingEvents() {
             try {
                 console.log("Loading upcoming events...");
-                const response = await fetch(`${API_PROXY_URL}/api/v2/events`);
-                if (response.ok) {
+                let allEvents = [];
+                let currentPage = 0;
+                let totalPages = 1;
+
+                while (currentPage < totalPages) {
+                    let response = await fetch(`${API_PROXY_URL}/api/v2/events?currentPage=${currentPage}&pageSize=200`);
+                    if (!response.ok && currentPage === 0) {
+                        response = await fetch(`${API_PROXY_URL}/api/v2/events`);
+                    }
+                    if (!response.ok) break;
                     const data = await response.json();
-                    console.log("Loaded events data:", data);
                     const events = data.events || data.searchResults || (Array.isArray(data) ? data : []);
-                    const todayParts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
-                    const todayStr = `${todayParts.find(p => p.type === 'year').value}-${todayParts.find(p => p.type === 'month').value}-${todayParts.find(p => p.type === 'day').value}`;
-                    upcomingEvents = events
-                        .filter(e => !e.archived && e.startDate >= todayStr)
-                        .sort((a, b) => a.startDate.localeCompare(b.startDate))
-                        .slice(0, 10);
-                    console.log("Filtered upcoming events:", upcomingEvents);
-                } else {
-                    console.error("Failed to load events, status:", response.status);
+                    allEvents = allEvents.concat(events);
+
+                    if (data.pagination && data.pagination.totalPages) {
+                        totalPages = data.pagination.totalPages;
+                    }
+                    currentPage++;
                 }
+
+                const todayParts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+                const todayStr = `${todayParts.find(p => p.type === 'year').value}-${todayParts.find(p => p.type === 'month').value}-${todayParts.find(p => p.type === 'day').value}`;
+                upcomingEvents = allEvents
+                    .filter(e => !e.archived && e.startDate >= todayStr)
+                    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+                console.log("Loaded total upcoming events:", upcomingEvents.length);
             } catch (e) {
                 console.error("Error loading events:", e);
             } finally {
@@ -278,6 +291,7 @@
             const data = await res.json();
             if (!res.ok || !data.individualAccount) throw new Error("Account not found.");
             currentAccount = data.individualAccount;
+            eventsCurrentPage = 1;
             updateBackgroundForMembership();
             await fetchAccountEventRegistrations(id);
             renderConfirmation();
@@ -561,6 +575,13 @@
             }
         }
 
+        function changeEventsPage(delta) {
+            eventsCurrentPage += delta;
+            renderUpcomingEventsRSVP();
+            const container = document.getElementById('upcoming-events-list');
+            if (container) container.scrollTop = 0;
+        }
+
         function renderUpcomingEventsRSVP() {
             const container = document.getElementById('upcoming-events-list');
             if (!container) return;
@@ -573,7 +594,7 @@
                 return;
             }
 
-            const membership = currentAccount.accountCurrentMembershipStatus || "None";
+            const membership = (currentAccount && currentAccount.accountCurrentMembershipStatus) || "None";
             const isMember = membership.toLowerCase() === 'active';
 
             const registered = [];
@@ -587,6 +608,14 @@
                 }
             });
 
+            const totalPages = Math.ceil(notRegistered.length / EVENTS_PER_PAGE) || 1;
+            if (eventsCurrentPage > totalPages) eventsCurrentPage = totalPages;
+            if (eventsCurrentPage < 1) eventsCurrentPage = 1;
+
+            const startIndex = (eventsCurrentPage - 1) * EVENTS_PER_PAGE;
+            const endIndex = startIndex + EVENTS_PER_PAGE;
+            const pageEvents = notRegistered.slice(startIndex, endIndex);
+
             const renderEventItem = (event, isAlreadyReg) => {
                 const dateParts = event.startDate.split('-');
                 const formattedDate = `${dateParts[1]}/${dateParts[2]}`; // MM/DD
@@ -596,9 +625,9 @@
                 if (isAlreadyReg) {
                     actionBtn = `<button disabled class="px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg font-bold text-sm cursor-default shadow-sm">✅ RSVP'd</button>`;
                 } else if (isMember) {
-                    actionBtn = `<button onclick="rsvpForEvent(${event.id}, this)" class="px-4 py-2 bg-cyan-600 text-white rounded-lg font-bold text-sm hover:bg-cyan-700 transition-colors shadow-sm">RSVP (Free)</button>`;
+                    actionBtn = `<button onclick="rsvpForEvent(${event.id}, this)" class="px-4 py-2 bg-cyan-600 text-white rounded-lg font-bold text-sm hover:bg-cyan-700 transition-colors shadow-sm cursor-pointer">RSVP (Free)</button>`;
                 } else {
-                    actionBtn = `<button onclick="showEventQR('${regUrl}', '${event.name.replace(/'/g, "\\'")}')" class="px-4 py-2 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-bold text-sm hover:bg-slate-200 transition-colors">Register</button>`;
+                    actionBtn = `<button onclick="showEventQR('${regUrl}', '${event.name.replace(/'/g, "\\'")}')" class="px-4 py-2 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-bold text-sm hover:bg-slate-200 transition-colors cursor-pointer">Register</button>`;
                 }
 
                 return `
@@ -616,19 +645,38 @@
 
             let html = '';
 
-            // 1. Render active events they can RSVP to
-            if (notRegistered.length > 0) {
-                html += notRegistered.map(e => renderEventItem(e, false)).join('');
+            // 1. Render active events for the current page
+            if (pageEvents.length > 0) {
+                html += `<div class="space-y-3">` + pageEvents.map(e => renderEventItem(e, false)).join('') + `</div>`;
             } else if (registered.length === 0) {
                 html += `<p class="text-gray-500 text-sm">No upcoming events found.</p>`;
+            } else {
+                html += `<p class="text-emerald-700 font-medium text-sm py-2">You're RSVP'd for all upcoming events! 🎉</p>`;
+            }
+
+            // Pagination controls if more than 1 page
+            if (totalPages > 1) {
+                html += `
+                    <div class="flex items-center justify-between pt-3 border-t border-slate-200 mt-3 no-print">
+                        <button onclick="changeEventsPage(-1)" ${eventsCurrentPage <= 1 ? 'disabled class="px-4 py-2 bg-slate-100 text-slate-400 rounded-xl font-bold text-sm cursor-not-allowed"' : 'class="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold text-sm shadow-sm transition-colors cursor-pointer"'}>
+                            ← Prev Page
+                        </button>
+                        <span class="text-sm font-bold text-slate-600">
+                            Page ${eventsCurrentPage} of ${totalPages}
+                        </span>
+                        <button onclick="changeEventsPage(1)" ${eventsCurrentPage >= totalPages ? 'disabled class="px-4 py-2 bg-slate-100 text-slate-400 rounded-xl font-bold text-sm cursor-not-allowed"' : 'class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl font-bold text-sm shadow-sm transition-colors cursor-pointer"'}>
+                            Next Page →
+                        </button>
+                    </div>
+                `;
             }
 
             // 2. Render events they are already registered for
             if (registered.length > 0) {
                 html += `
                     <div class="border-t border-slate-200 my-4 pt-4">
-                        <p class="font-bold text-slate-500 mb-3 text-sm uppercase tracking-wider">Already RSVP'd</p>
-                        <div class="space-y-3">
+                        <p class="font-bold text-slate-500 mb-3 text-sm uppercase tracking-wider">Already RSVP'd (${registered.length})</p>
+                        <div class="space-y-3 max-h-48 overflow-y-auto pr-1">
                             ${registered.map(e => renderEventItem(e, true)).join('')}
                         </div>
                     </div>
@@ -944,6 +992,7 @@
                 document.getElementById('nametag-to-print').innerHTML = finalTagHTML;
                 
                 showStage('stage-success');
+                eventsCurrentPage = 1;
                 renderUpcomingEventsRSVP();
                 renderLinkCardControls();
                 renderCreativeTeensButton();
