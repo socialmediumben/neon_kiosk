@@ -109,7 +109,7 @@
             <div class="spinner"></div>
             <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
         </div>
-        <p class="text-xs text-gray-300 mt-6 text-center no-print">v4.6</p>
+        <p class="text-xs text-gray-300 mt-6 text-center no-print">v4.7</p>
     </div>
 
     <div id="nametag-to-print" class="hidden"></div>
@@ -560,12 +560,10 @@
                 "Creative Teens Club Check-In": "8",
                 "Electronics Club Check-In": "10",
                 "TTRPG Club Check-In": "11",
-                "Process Art Club Check-In": "12",
-                "Drawing & Storytelling Club Check-In": "13",
-                "Drawing and Storytelling Club Check-In": "13"
+                "Process Art Club Check-In": "12"
             };
             let customStatusId = statusMap[subject];
-            if (!customStatusId && Array.isArray(availableCustomStatuses)) {
+            if (!customStatusId && Array.isArray(availableCustomStatuses) && availableCustomStatuses.length > 0) {
                 const norm = str => str.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]/g, '');
                 const cleanSub = norm(subject.replace(/ Check-In/i, ''));
                 const found = availableCustomStatuses.find(s => {
@@ -573,6 +571,13 @@
                     return cleanStatus === cleanSub || cleanStatus.includes(cleanSub) || cleanSub.includes(cleanStatus);
                 });
                 if (found) customStatusId = found.id;
+            }
+
+            if (customStatusId && Array.isArray(availableCustomStatuses) && availableCustomStatuses.length > 0) {
+                const exists = availableCustomStatuses.some(s => String(s.id) === String(customStatusId));
+                if (!exists) {
+                    customStatusId = null;
+                }
             }
 
             const payload = {
