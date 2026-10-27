@@ -6,6 +6,9 @@
     <title>Social Medium ID Check-In</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Central Social Medium Certifications & Tool Icons SSOT -->
+    <script src="sm-certifications.js"></script>
+    <script src="https://socialmediumben.github.io/social_medium_app/shared/sm-certifications.js"></script>
     <style>
         .stage { display: none; }
         .active-stage { display: block; }
@@ -109,7 +112,7 @@
             <div class="spinner"></div>
             <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
         </div>
-        <p class="text-xs text-gray-300 mt-6 text-center no-print">v4.7</p>
+        <p class="text-xs text-gray-300 mt-6 text-center no-print">v4.8</p>
     </div>
 
     <div id="nametag-to-print" class="hidden"></div>
@@ -119,6 +122,7 @@
         const WAIVER_FIELD_ID = "87";
         const INTERESTS_FIELD_ID = "81";
         const CUSTOM_INTERESTS_FIELD_ID = "83";
+        const CERTIFICATIONS_FIELD_ID = "116";
         const SYSTEM_USER_ID = "3508"; 
         const WAIVER_URL = "https://socialmedium.app.neoncrm.com/forms/waiver";
         const EVENTS_URL = "https://socialmedium.app.neoncrm.com/np/constituent/eventList.do?orgId=socialmedium";
@@ -364,6 +368,21 @@
                 ? '<div class="h-24 w-24 flex items-center justify-center text-8xl leading-none text-black">★</div>'
                 : '<div class="border-4 border-black rounded-full h-24 w-24"></div>';
 
+            const certField = fields.find(f => f.id === CERTIFICATIONS_FIELD_ID);
+            let certsList = [];
+            if (certField) {
+                if (Array.isArray(certField.optionValues)) {
+                    certsList = certField.optionValues.map(o => o.name || o.value || o);
+                } else if (certField.value) {
+                    certsList = [certField.value];
+                }
+            }
+
+            let certsHTML = '';
+            if (typeof SMCertifications !== 'undefined' && typeof SMCertifications.renderNametagIcons === 'function') {
+                certsHTML = SMCertifications.renderNametagIcons(certsList);
+            }
+
             return `
                 <div class="border-[12px] border-black rounded-[40px] p-12 text-left bg-white w-full max-w-3xl aspect-[3/2] flex flex-col justify-between">
                     <div>
@@ -373,9 +392,10 @@
                         </div>
                         <div class="text-3xl font-bold mt-4 text-black">Pronouns: ${pronouns}</div>
                     </div>
-                    <div class="mt-8">
+                    <div class="mt-6">
                         <div class="text-4xl font-black italic uppercase text-gray-300">I'm Nerdy for...</div>
                         <div class="text-3xl font-bold mt-2 leading-tight text-black">${combinedInterests || "Everything!"}</div>
+                        ${certsHTML}
                     </div>
                 </div>
             `;
