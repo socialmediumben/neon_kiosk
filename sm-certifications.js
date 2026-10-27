@@ -186,57 +186,64 @@
 
   /**
    * Generates Nametag HTML for the Check-In Kiosk.
-   * Renders solid black icons with bold '+' for high-contrast thermal printing.
+   * Renders pure solid black icons with bold '+' for thermal printing.
+   * NO text labels to conserve nametag space.
    */
   function renderNametagIcons(certsList) {
     var items = dedupeAndGroup(certsList);
     if (items.length === 0) return '';
 
-    var html = '<div class="nametag-certs-row flex items-center gap-4 mt-6 pt-6 border-t-4 border-black">';
-    html += '<div class="text-2xl font-black uppercase text-black tracking-wider">Certified:</div>';
-    html += '<div class="flex items-center gap-5 flex-wrap">';
+    var html = '<div class="nametag-certs-row flex items-center gap-3 mt-4 pt-4 border-t-4 border-black flex-wrap">';
 
     items.forEach(function (item) {
-      // Clean pure black SVG for thermal printing
-      var blackSvg = item.iconSvg.replace(/stroke="currentColor"/g, 'stroke="#000000"').replace(/width="24" height="24"/g, 'width="36" height="36"');
-      html += '<div class="flex items-center gap-1 bg-gray-100 px-3 py-1.5 rounded-xl border-2 border-black" title="' + item.name + (item.isAdvanced ? ' (Advanced)' : '') + '">';
-      html += '<div class="w-9 h-9 flex items-center justify-center shrink-0">' + blackSvg + '</div>';
-      html += '<span class="text-xl font-black text-black">' + item.name + '</span>';
+      // Pure black SVG for thermal printing (no text, just icon + '+' badge)
+      var blackSvg = item.iconSvg
+        .replace(/stroke="currentColor"/g, 'stroke="#000000"')
+        .replace(/width="24" height="24"/g, 'width="44" height="44"');
+
+      html += '<div class="relative flex items-center justify-center p-2 rounded-2xl border-4 border-black bg-white" title="' + item.name + (item.isAdvanced ? ' (Advanced)' : '') + '">';
+      html += '<div class="w-11 h-11 flex items-center justify-center shrink-0">' + blackSvg + '</div>';
       if (item.isAdvanced) {
-        html += '<span class="text-2xl font-black text-black leading-none ml-0.5">+</span>';
+        html += '<span class="text-3xl font-black text-black leading-none ml-1">+</span>';
       }
       html += '</div>';
     });
 
-    html += '</div></div>';
+    html += '</div>';
     return html;
   }
 
   /**
-   * Generates colored UI Badges for Portal Door passport and Companion App.
+   * Generates video-game style achievement badges for Portal Door passport and Companion App.
+   * Big icon badges on top with small caption underneath.
+   * Completely omits the redundant "Authorized" label.
    */
-  function renderColorBadges(certsList) {
+  function renderGameBadges(certsList) {
     var items = dedupeAndGroup(certsList);
-    if (items.length === 0) return '<div class="cert-empty">No tool certifications recorded yet.</div>';
+    if (items.length === 0) {
+      return '<div class="cert-empty">No tool certifications recorded yet in Neon One.<br>Attend an equipment walkthrough to unlock badges!</div>';
+    }
 
-    var html = '';
+    var html = '<div class="cert-game-grid">';
     items.forEach(function (item) {
-      var colorSvg = item.iconSvg.replace(/stroke="currentColor"/g, 'stroke="' + item.color + '"');
-      html += '<div class="cert-item" style="border-left: 3px solid ' + item.color + '">';
-      html += '  <div class="cert-icon-box shrink-0" style="color: ' + item.color + '">';
-      html += '    ' + colorSvg;
-      html += '  </div>';
-      html += '  <div class="cert-details flex-1 ml-2 text-left">';
-      html += '    <div class="cert-name font-bold text-sm text-stone-900">' + item.name;
+      var colorSvg = item.iconSvg
+        .replace(/stroke="currentColor"/g, 'stroke="' + item.color + '"')
+        .replace(/width="24" height="24"/g, 'width="52" height="52"');
+
+      html += '<div class="cert-game-badge" style="--badge-color: ' + item.color + '">';
+      html += '  <div class="cert-badge-frame">';
+      html += '    <div class="cert-badge-icon">' + colorSvg + '</div>';
       if (item.isAdvanced) {
-        html += ' <span class="cert-plus-tag inline-block px-1.5 py-0.2 rounded font-black text-xs text-white" style="background:' + item.color + '" title="Advanced Certification">+</span>';
+        html += '    <div class="cert-badge-plus" title="Advanced (+)">+</div>';
       }
-      html += '    </div>';
-      html += '    <div class="cert-category text-xs text-stone-500">' + item.category + ' • ' + item.level + '</div>';
       html += '  </div>';
-      html += '  <span class="cert-tag text-xs font-semibold px-2 py-0.5 rounded-full" style="background:' + item.color + '15; color:' + item.color + '">Authorized</span>';
+      html += '  <div class="cert-badge-caption">';
+      html += '    <div class="cert-badge-title">' + item.name + '</div>';
+      html += '    <div class="cert-badge-level">' + item.level + '</div>';
+      html += '  </div>';
       html += '</div>';
     });
+    html += '</div>';
 
     return html;
   }
@@ -247,6 +254,7 @@
     resolve: resolve,
     dedupeAndGroup: dedupeAndGroup,
     renderNametagIcons: renderNametagIcons,
-    renderColorBadges: renderColorBadges
+    renderColorBadges: renderGameBadges,
+    renderGameBadges: renderGameBadges
   };
 }));
