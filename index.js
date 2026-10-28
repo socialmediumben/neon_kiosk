@@ -138,6 +138,89 @@ app.post('/api/announcement', (req, res) => {
 });
 
 // ============================================================================
+// Portal Photos API (Stores & retrieves photobooth captures by tap card)
+// ============================================================================
+const PORTAL_PHOTOS_FILE = path.join(__dirname, 'portal_photos.json');
+
+const getStoredPortalPhotos = () => {
+    try {
+        if (fs.existsSync(PORTAL_PHOTOS_FILE)) {
+            const raw = fs.readFileSync(PORTAL_PHOTOS_FILE, 'utf8');
+            const data = JSON.parse(raw);
+            return Array.isArray(data) ? data : [];
+        }
+    } catch (e) {
+        console.error('[Portal Photos] Error reading portal_photos.json:', e);
+    }
+    return [];
+};
+
+const saveStoredPortalPhotos = (photos) => {
+    try {
+        fs.writeFileSync(PORTAL_PHOTOS_FILE, JSON.stringify(photos, null, 2), 'utf8');
+        return true;
+    } catch (e) {
+        console.error('[Portal Photos] Error writing portal_photos.json:', e);
+        return false;
+    }
+};
+
+app.get('/api/portal-photos', (req, res) => {
+    try {
+        const { cardId, limit } = req.query;
+        let photos = getStoredPortalPhotos();
+
+        if (cardId) {
+            const cleanCard = String(cardId).trim().toLowerCase();
+            photos = photos.filter(p => String(p.cardId || '').trim().toLowerCase() === cleanCard);
+        }
+
+        // Sort descending by timestamp (newest first)
+        photos.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+        const max = parseInt(limit, 10) || 50;
+        photos = photos.slice(0, max);
+
+        res.json({ success: true, photos });
+    } catch (err) {
+        console.error('[Portal Photos] GET error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/portal-photos', (req, res) => {
+    try {
+        const { cardId, url, fileId, downloadUrl, timestamp } = req.body;
+        if (!url) {
+            return res.status(400).json({ success: false, error: 'Photo URL is required.' });
+        }
+
+        const photos = getStoredPortalPhotos();
+        const photoRecord = {
+            id: 'photo_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+            cardId: cardId ? String(cardId).trim() : '',
+            url: String(url).trim(),
+            fileId: fileId ? String(fileId).trim() : '',
+            downloadUrl: downloadUrl ? String(downloadUrl).trim() : (fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : url),
+            timestamp: timestamp || new Date().toISOString()
+        };
+
+        photos.unshift(photoRecord);
+        // Keep up to 500 recent photos
+        if (photos.length > 500) {
+            photos.splice(500);
+        }
+
+        saveStoredPortalPhotos(photos);
+        console.log(`[Portal Photos] Stored photo for card "${photoRecord.cardId}": ${photoRecord.url}`);
+        res.json({ success: true, photo: photoRecord });
+    } catch (err) {
+        console.error('[Portal Photos] POST error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ============================================================================
 // Neon CRM Activities Intelligence Dashboard Backend Routes
 // ============================================================================
 
