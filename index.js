@@ -23,7 +23,7 @@ app.get('/', (req, res) => {
 app.use(express.static(__dirname));
 
 // Neon One Constituent OAuth Token Exchange
-const NEON_OAUTH_CLIENT_ID = process.env.NEON_OAUTH_CLIENT_ID || 'QBY_hNyRYp1-aVKwOmQ8ELY6tCd6vW2KJ00k57X3hWCY1wsiz87dFfD7IT7hVgqiyjsBkw8VUPJoOuBy0xVnfg==';
+const NEON_OAUTH_CLIENT_ID = process.env.NEON_OAUTH_CLIENT_ID || 'QBY_hNyRYp1-aVKwOmQ8ELY6tCd6vW2KJ00k57X3hWCY1wsiz87dFfD7lT7hVgqiyjsBkw8VUPJoOuBy0xVnfg==';
 const NEON_OAUTH_CLIENT_SECRET = process.env.NEON_OAUTH_CLIENT_SECRET || 'ab489c86-81c7-3a9d-a2a8-82a5e95e3ae8';
 const NEON_OAUTH_TOKEN_URL = 'https://socialmedium.app.neoncrm.com/nx/auth/oauth/token';
 
