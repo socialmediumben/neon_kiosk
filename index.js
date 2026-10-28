@@ -42,6 +42,7 @@ app.post('/api/oauth/token', async (req, res) => {
         params.append('redirect_uri', redirect_uri || 'https://app.socialmedium.space/auth/callback');
 
         const tokenUrl = `${NEON_OAUTH_TOKEN_URL}?${params.toString()}`;
+        console.log(`[OAuth] Exchanging code for token with redirect_uri: ${redirect_uri || 'https://app.socialmedium.space/auth/callback/'}`);
 
         const tokenResponse = await fetch(tokenUrl, {
             method: 'POST',
@@ -51,6 +52,7 @@ app.post('/api/oauth/token', async (req, res) => {
         });
 
         const text = await tokenResponse.text();
+        console.log(`[OAuth] Neon response status: ${tokenResponse.status}, body: ${text}`);
         try {
             const data = JSON.parse(text);
             return res.status(tokenResponse.status).json(data);
