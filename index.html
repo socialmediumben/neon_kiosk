@@ -265,24 +265,58 @@
             throw new Error("No accounts found.");
         }
 
-        async function searchByTapCard(tapCardNo) {
-            const payload = {
-                "searchFields": [{ "field": "Tap Card", "operator": "EQUAL", "value": tapCardNo }],
-                "outputFields": ["First Name", "Last Name", "Preferred Name", "Account ID"],
-                "pagination": { "currentPage": 0, "pageSize": 10 }
-            };
-            try {
-                const response = await fetch(`${API_PROXY_URL}/api/v2/accounts/search`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (!response.ok) return [];
-                const data = await response.json();
-                return data.searchResults || [];
-            } catch (e) {
-                return [];
+        // Universal NFC / RFID Tap Card Normalization
+        function normalizeNfcTapCard(raw) {
+            if (!raw) return '';
+            const clean = String(raw).trim();
+            if (/^\d{8,10}$/.test(clean)) return clean;
+            const byteParts = clean.split(/[:\-\s]+/);
+            if (byteParts.length >= 4 && byteParts.every(p => /^[0-9a-fA-F]{1,2}$/.test(p))) {
+                const hex4Reverse = byteParts.slice(0, 4).reverse().map(p => p.padStart(2, '0')).join('');
+                const dec = parseInt(hex4Reverse, 16);
+                if (!isNaN(dec)) return dec.toString();
             }
+            if (/^[0-9a-fA-F]{14}$/.test(clean)) {
+                const b0 = clean.substring(0, 2), b1 = clean.substring(2, 4), b2 = clean.substring(4, 6), b3 = clean.substring(6, 8);
+                const dec = parseInt(b3 + b2 + b1 + b0, 16);
+                if (!isNaN(dec)) return dec.toString();
+            }
+            if (/^[0-9a-fA-F]{8}$/.test(clean)) {
+                const dec = parseInt(clean, 16);
+                if (!isNaN(dec)) return dec.toString();
+            }
+            return clean;
+        }
+
+        async function searchByTapCard(tapCardNo) {
+            const cleanCard = String(tapCardNo).trim();
+            const normalizedCard = normalizeNfcTapCard(cleanCard);
+
+            const executeSearch = async (cardVal) => {
+                const payload = {
+                    "searchFields": [{ "field": "Tap Card", "operator": "EQUAL", "value": cardVal }],
+                    "outputFields": ["First Name", "Last Name", "Preferred Name", "Account ID"],
+                    "pagination": { "currentPage": 0, "pageSize": 10 }
+                };
+                try {
+                    const response = await fetch(`${API_PROXY_URL}/api/v2/accounts/search`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) return [];
+                    const data = await response.json();
+                    return data.searchResults || [];
+                } catch (e) {
+                    return [];
+                }
+            };
+
+            let accounts = await executeSearch(normalizedCard);
+            if (accounts.length === 0 && normalizedCard !== cleanCard) {
+                accounts = await executeSearch(cleanCard);
+            }
+            return accounts;
         }
 
         async function searchByName(lastName) {
@@ -942,6 +976,8 @@
             isLinkingCard = false;
             if (cardListeningTimeout) clearTimeout(cardListeningTimeout);
 
+            const canonicalCardNo = normalizeNfcTapCard(cardNo);
+
             const btn = document.getElementById('btn-link-card');
             if (btn) {
                 btn.textContent = "Saving...";
@@ -953,7 +989,7 @@
                     accountCustomFields: [
                         {
                             id: "114",
-                            value: cardNo
+                            value: canonicalCardNo
                         }
                     ]
                 }
@@ -972,9 +1008,9 @@
                 if (!currentAccount.accountCustomFields) currentAccount.accountCustomFields = [];
                 const fieldIndex = currentAccount.accountCustomFields.findIndex(cf => cf.id === "114");
                 if (fieldIndex !== -1) {
-                    currentAccount.accountCustomFields[fieldIndex].value = cardNo;
+                    currentAccount.accountCustomFields[fieldIndex].value = canonicalCardNo;
                 } else {
-                    currentAccount.accountCustomFields.push({ id: "114", name: "Tap Card", value: cardNo });
+                    currentAccount.accountCustomFields.push({ id: "114", name: "Tap Card", value: canonicalCardNo });
                 }
 
                 if (btn) {
