@@ -73,6 +73,71 @@ app.post('/api/oauth/token', async (req, res) => {
 });
 
 // ============================================================================
+// Announcements API (Community Noticeboard for Social Medium App)
+// ============================================================================
+const ANNOUNCEMENT_FILE = path.join(__dirname, 'announcement.json');
+
+const DEFAULT_ANNOUNCEMENT = {
+    id: 'sm-announcement-default',
+    title: 'Welcome to Social Medium!',
+    message: 'Welcome to the official Social Medium Makerspace app! Check out upcoming events, view your tool certifications, and keep your profile up to date.',
+    author: 'Ben Braunstein',
+    updatedAt: new Date().toISOString(),
+    active: true
+};
+
+const getStoredAnnouncement = () => {
+    try {
+        if (fs.existsSync(ANNOUNCEMENT_FILE)) {
+            const raw = fs.readFileSync(ANNOUNCEMENT_FILE, 'utf8');
+            return JSON.parse(raw);
+        }
+    } catch (e) {
+        console.error('[Announcement] Error reading announcement.json:', e);
+    }
+    return DEFAULT_ANNOUNCEMENT;
+};
+
+const saveStoredAnnouncement = (data) => {
+    try {
+        fs.writeFileSync(ANNOUNCEMENT_FILE, JSON.stringify(data, null, 2), 'utf8');
+        return true;
+    } catch (e) {
+        console.error('[Announcement] Error writing announcement.json:', e);
+        return false;
+    }
+};
+
+app.get('/api/announcement', (req, res) => {
+    const announcement = getStoredAnnouncement();
+    res.json({ success: true, announcement });
+});
+
+app.post('/api/announcement', (req, res) => {
+    try {
+        const { title, message, author, active } = req.body;
+        if (!title || !message) {
+            return res.status(400).json({ success: false, error: 'Title and message are required.' });
+        }
+        const current = getStoredAnnouncement();
+        const updated = {
+            id: current.id || 'sm-announcement-' + Date.now(),
+            title: String(title).trim(),
+            message: String(message).trim(),
+            author: author ? String(author).trim() : (current.author || 'Makerspace Staff'),
+            updatedAt: new Date().toISOString(),
+            active: active !== undefined ? Boolean(active) : true
+        };
+        saveStoredAnnouncement(updated);
+        console.log(`[Announcement] Updated by ${updated.author}: "${updated.title}"`);
+        res.json({ success: true, announcement: updated });
+    } catch (err) {
+        console.error('[Announcement] Failed to save announcement:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ============================================================================
 // Neon CRM Activities Intelligence Dashboard Backend Routes
 // ============================================================================
 
