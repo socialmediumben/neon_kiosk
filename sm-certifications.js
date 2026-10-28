@@ -1,7 +1,7 @@
 /**
  * Social Medium Certifications & Icons Universal Library (SSOT)
  * Single Source of Truth for all Social Medium platforms:
- * - Social Medium Companion App
+ * - Social Medium App
  * - Portal Door
  * - Check-In Kiosk
  * - Home Controller
@@ -214,7 +214,7 @@
   }
 
   /**
-   * Generates video-game style achievement badges for Portal Door passport and Companion App.
+   * Generates video-game style achievement badges for Portal Door passport and Social Medium App.
    * Big icon badges on top with small caption underneath.
    * Completely omits the redundant "Authorized" label.
    */
