@@ -22,6 +22,47 @@ app.get('/', (req, res) => {
 // Serve everything else, like discovery.html
 app.use(express.static(__dirname));
 
+// Neon One Constituent OAuth Token Exchange
+const NEON_OAUTH_CLIENT_ID = process.env.NEON_OAUTH_CLIENT_ID || 'QBY_hNyRYp1-aVKwOmQ8ELY6tCd6vW2KJ00k57X3hWCY1wsiz87dFfD7IT7hVgqiyjsBkw8VUPJoOuBy0xVnfg==';
+const NEON_OAUTH_CLIENT_SECRET = process.env.NEON_OAUTH_CLIENT_SECRET || 'ab489c86-81c7-3a9d-a2a8-82a5e95e3ae8';
+const NEON_OAUTH_TOKEN_URL = 'https://socialmedium.app.neoncrm.com/nx/auth/oauth/token';
+
+app.post('/api/oauth/token', async (req, res) => {
+    try {
+        const { code, redirect_uri } = req.body;
+        if (!code) {
+            return res.status(400).json({ error: 'Authorization code is required' });
+        }
+
+        const params = new URLSearchParams();
+        params.append('grant_type', 'authorization_code');
+        params.append('client_id', NEON_OAUTH_CLIENT_ID);
+        params.append('client_secret', NEON_OAUTH_CLIENT_SECRET);
+        params.append('code', code);
+        params.append('redirect_uri', redirect_uri || 'https://app.socialmedium.space/auth/callback');
+
+        const tokenUrl = `${NEON_OAUTH_TOKEN_URL}?${params.toString()}`;
+
+        const tokenResponse = await fetch(tokenUrl, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        const text = await tokenResponse.text();
+        try {
+            const data = JSON.parse(text);
+            return res.status(tokenResponse.status).json(data);
+        } catch (e) {
+            return res.status(tokenResponse.status).send(text);
+        }
+    } catch (err) {
+        console.error('OAuth token exchange error:', err);
+        return res.status(500).json({ error: 'OAuth exchange failed', message: err.message });
+    }
+});
+
 // Full API Proxy for direct account lookups and check-in activities
 app.all('/api/*', async (req, res) => {
     try {
