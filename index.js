@@ -221,6 +221,234 @@ app.post('/api/portal-photos', (req, res) => {
 });
 
 // ============================================================================
+// Costume Contest API (Portal Door Photobooth & Social Medium App Module)
+// ============================================================================
+const COSTUME_CONTEST_FILE = path.join(__dirname, 'costume_contest.json');
+
+const DEFAULT_COSTUME_CONTEST = {
+    status: 'submissions', // 'submissions' | 'voting' | 'ended'
+    updatedAt: new Date().toISOString(),
+    entries: [],
+    votes: {} // voterId -> entryId
+};
+
+const getStoredCostumeContest = () => {
+    try {
+        if (fs.existsSync(COSTUME_CONTEST_FILE)) {
+            const raw = fs.readFileSync(COSTUME_CONTEST_FILE, 'utf8');
+            const data = JSON.parse(raw);
+            if (data && typeof data === 'object') {
+                if (!Array.isArray(data.entries)) data.entries = [];
+                if (!data.votes || typeof data.votes !== 'object') data.votes = {};
+                if (!data.status) data.status = 'submissions';
+                return data;
+            }
+        }
+    } catch (e) {
+        console.error('[Costume Contest] Error reading costume_contest.json:', e);
+    }
+    return JSON.parse(JSON.stringify(DEFAULT_COSTUME_CONTEST));
+};
+
+const saveStoredCostumeContest = (data) => {
+    try {
+        fs.writeFileSync(COSTUME_CONTEST_FILE, JSON.stringify(data, null, 2), 'utf8');
+        return true;
+    } catch (e) {
+        console.error('[Costume Contest] Error writing costume_contest.json:', e);
+        return false;
+    }
+};
+
+app.get('/api/costume-contest', (req, res) => {
+    try {
+        const contest = getStoredCostumeContest();
+        const isDev = req.query.dev === 'true' || req.query.isDev === 'true';
+        const voterId = req.query.voterId ? String(req.query.voterId).trim() : null;
+
+        // Calculate vote counts per entry
+        const voteCounts = {};
+        Object.values(contest.votes).forEach(entryId => {
+            voteCounts[entryId] = (voteCounts[entryId] || 0) + 1;
+        });
+
+        const totalVotes = Object.keys(contest.votes).length;
+
+        // Prepare entries with or without vote counts depending on role / phase
+        const entriesWithVotes = contest.entries.map(entry => {
+            const count = voteCounts[entry.id] || 0;
+            const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+            if (isDev || contest.status === 'ended') {
+                return { ...entry, votesCount: count, votePercentage: pct };
+            }
+            return { ...entry }; // Hide vote counts during active voting to prevent bias
+        });
+
+        // Generate leaderboard for developers or when ended
+        let leaderboard = null;
+        if (isDev || contest.status === 'ended') {
+            leaderboard = [...entriesWithVotes].sort((a, b) => (b.votesCount || 0) - (a.votesCount || 0));
+        }
+
+        const userVotedEntryId = voterId && contest.votes[voterId] ? contest.votes[voterId] : null;
+
+        res.json({
+            success: true,
+            status: contest.status,
+            updatedAt: contest.updatedAt,
+            entries: entriesWithVotes,
+            totalVotes,
+            userVotedEntryId,
+            leaderboard
+        });
+    } catch (err) {
+        console.error('[Costume Contest] GET error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/costume-contest/entry', (req, res) => {
+    try {
+        const { photoUrl, cardIds, participantNames, fileId, costumeTitle, timestamp } = req.body;
+        if (!photoUrl) {
+            return res.status(400).json({ success: false, error: 'photoUrl is required.' });
+        }
+
+        const contest = getStoredCostumeContest();
+
+        const newEntry = {
+            id: 'contest_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+            photoUrl: String(photoUrl).trim(),
+            fileId: fileId ? String(fileId).trim() : '',
+            cardIds: Array.isArray(cardIds) ? cardIds : (cardIds ? [String(cardIds)] : []),
+            participantNames: Array.isArray(participantNames) ? participantNames : (participantNames ? [String(participantNames)] : []),
+            costumeTitle: costumeTitle ? String(costumeTitle).trim() : '',
+            timestamp: timestamp || new Date().toISOString()
+        };
+
+        // Prepend so newest entries appear first
+        contest.entries.unshift(newEntry);
+        contest.updatedAt = new Date().toISOString();
+
+        saveStoredCostumeContest(contest);
+        console.log(`[Costume Contest] New entry submitted: ${newEntry.id} (${newEntry.participantNames.join(', ') || 'Contestant'})`);
+        res.json({ success: true, entry: newEntry });
+    } catch (err) {
+        console.error('[Costume Contest] Entry POST error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/costume-contest/status', (req, res) => {
+    try {
+        const { status } = req.body;
+        if (!['submissions', 'voting', 'ended'].includes(status)) {
+            return res.status(400).json({ success: false, error: 'Invalid status. Must be submissions, voting, or ended.' });
+        }
+
+        const contest = getStoredCostumeContest();
+        contest.status = status;
+        contest.updatedAt = new Date().toISOString();
+        saveStoredCostumeContest(contest);
+
+        console.log(`[Costume Contest] Status changed to: ${status}`);
+        res.json({ success: true, status: contest.status });
+    } catch (err) {
+        console.error('[Costume Contest] Status POST error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/costume-contest/vote', (req, res) => {
+    try {
+        const { voterId, entryId } = req.body;
+        if (!voterId || !entryId) {
+            return res.status(400).json({ success: false, error: 'voterId and entryId are required.' });
+        }
+
+        const contest = getStoredCostumeContest();
+        if (contest.status !== 'voting') {
+            return res.status(400).json({ success: false, error: 'Voting is not currently active.' });
+        }
+
+        const cleanVoter = String(voterId).trim();
+        const cleanEntry = String(entryId).trim();
+
+        // Check entry exists
+        const exists = contest.entries.some(e => e.id === cleanEntry);
+        if (!exists) {
+            return res.status(404).json({ success: false, error: 'Contest entry not found.' });
+        }
+
+        // Record vote (replaces previous vote if user changes their mind)
+        contest.votes[cleanVoter] = cleanEntry;
+        contest.updatedAt = new Date().toISOString();
+        saveStoredCostumeContest(contest);
+
+        const totalVotes = Object.keys(contest.votes).length;
+        console.log(`[Costume Contest] Vote recorded: ${cleanVoter} -> ${cleanEntry} (Total: ${totalVotes})`);
+        res.json({ success: true, votedEntryId: cleanEntry, totalVotes });
+    } catch (err) {
+        console.error('[Costume Contest] Vote POST error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/costume-contest/delete', (req, res) => {
+    try {
+        const { entryId } = req.body;
+        if (!entryId) {
+            return res.status(400).json({ success: false, error: 'entryId is required.' });
+        }
+
+        const cleanEntry = String(entryId).trim();
+        const contest = getStoredCostumeContest();
+
+        const prevCount = contest.entries.length;
+        contest.entries = contest.entries.filter(e => e.id !== cleanEntry);
+
+        if (contest.entries.length === prevCount) {
+            return res.status(404).json({ success: false, error: 'Entry not found.' });
+        }
+
+        // Clean up any votes that pointed to this entry
+        let cleanedVotesCount = 0;
+        Object.keys(contest.votes).forEach(vId => {
+            if (contest.votes[vId] === cleanEntry) {
+                delete contest.votes[vId];
+                cleanedVotesCount++;
+            }
+        });
+
+        contest.updatedAt = new Date().toISOString();
+        saveStoredCostumeContest(contest);
+
+        console.log(`[Costume Contest] Deleted entry: ${cleanEntry} (and cleaned up ${cleanedVotesCount} vote(s))`);
+        res.json({ success: true, deletedEntryId: cleanEntry, cleanedVotesCount });
+    } catch (err) {
+        console.error('[Costume Contest] Delete POST error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/costume-contest/reset', (req, res) => {
+    try {
+        const contest = {
+            status: 'submissions',
+            updatedAt: new Date().toISOString(),
+            entries: [],
+            votes: {}
+        };
+        saveStoredCostumeContest(contest);
+        console.log('[Costume Contest] Reset contest data to blank state.');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[Costume Contest] Reset POST error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ============================================================================
 // Neon CRM Activities Intelligence Dashboard Backend Routes
 // ============================================================================
 
