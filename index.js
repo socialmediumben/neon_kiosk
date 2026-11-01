@@ -220,19 +220,31 @@ async function syncPortalPhotosFromSheet(force = false) {
 
             const timestamp = cleanFields[0] || new Date().toISOString();
             const cardId = cleanFields[1] || '';
-            const url = cleanFields[4] || '';
-            const fileId = cleanFields[5] || '';
+            let url = cleanFields[4] || '';
+            let fileId = cleanFields[5] || '';
 
-            if (url && url.startsWith('http') && !map.has(url)) {
-                map.set(url, {
-                    id: fileId || `photo_${Date.now()}_${i}`,
-                    cardId: normalizeNfcTapCard(cardId) || cardId,
-                    rawCardId: cardId,
-                    url: url,
-                    fileId: fileId,
-                    downloadUrl: fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : url,
-                    timestamp: timestamp
-                });
+            // Automatically normalize Google Drive share links to high-speed direct image links
+            const driveMatch = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)([a-zA-Z0-9_-]+)/);
+            if (driveMatch && driveMatch[1]) {
+                if (!fileId) fileId = driveMatch[1];
+                url = `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+            }
+
+            if (url && url.startsWith('http')) {
+                const normCard = normalizeNfcTapCard(cardId) || cardId;
+                const existing = map.get(url);
+                // Insert or update with latest Card ID from Google Sheet
+                if (!existing || (!existing.cardId && normCard) || (existing.cardId !== normCard && normCard)) {
+                    map.set(url, {
+                        id: fileId || (existing?.id) || `photo_${Date.now()}_${i}`,
+                        cardId: normCard,
+                        rawCardId: cardId,
+                        url: url,
+                        fileId: fileId || (existing?.fileId) || '',
+                        downloadUrl: fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : url,
+                        timestamp: timestamp
+                    });
+                }
             }
         }
 
