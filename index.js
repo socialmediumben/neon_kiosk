@@ -261,6 +261,34 @@ async function syncPortalPhotosFromSheet(force = false) {
             }
         }
 
+        // Also sync from Google Apps Script Web App (reads complete sheet regardless of blank row gaps and includes Drive photos)
+        try {
+            const appsScriptRes = await fetch(`https://script.google.com/macros/s/AKfycbw8sI54Tsza9NwwLd-Id3DgGBg69L4N0VxwSp9d3_dryLdSB5CvmPGtPpzt2uymKRjwcQ/exec?t=${now}`);
+            if (appsScriptRes.ok) {
+                const asData = await appsScriptRes.json();
+                if (asData && Array.isArray(asData.photos)) {
+                    asData.photos.forEach(p => {
+                        if (p && p.url) {
+                            const rawCardField = p.cardId || '';
+                            const tokens = rawCardField.split(/[,;|\/\s]+/).map(t => t.trim()).filter(Boolean);
+                            const normalizedTokens = tokens.map(t => normalizeNfcTapCard(t) || t);
+                            const existing = map.get(p.url);
+                            map.set(p.url, {
+                                id: p.fileId || existing?.id || p.id || `photo_${Date.now()}`,
+                                cardId: normalizedTokens.join(', ') || rawCardField,
+                                rawCardId: rawCardField,
+                                cardIds: normalizedTokens.length > 0 ? normalizedTokens : (rawCardField ? [rawCardField] : []),
+                                url: p.url,
+                                fileId: p.fileId || existing?.fileId || '',
+                                downloadUrl: p.downloadUrl || p.url,
+                                timestamp: p.timestamp || existing?.timestamp || new Date().toISOString()
+                            });
+                        }
+                    });
+                }
+            }
+        } catch (_) {}
+
         const merged = Array.from(map.values());
         merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         saveStoredPortalPhotos(merged);
