@@ -370,6 +370,7 @@ const COSTUME_CONTEST_FILE = path.join(__dirname, 'costume_contest.json');
 
 const DEFAULT_COSTUME_CONTEST = {
     status: 'submissions', // 'submissions' | 'voting' | 'ended'
+    visibility: 'all', // 'all' (all users) | 'staff' (staff only) | 'none' (hidden from everyone except developer)
     updatedAt: new Date().toISOString(),
     entries: [],
     votes: {} // voterId -> entryId
@@ -384,6 +385,9 @@ const getStoredCostumeContest = () => {
                 if (!Array.isArray(data.entries)) data.entries = [];
                 if (!data.votes || typeof data.votes !== 'object') data.votes = {};
                 if (!data.status) data.status = 'submissions';
+                if (!data.visibility || !['all', 'staff', 'none'].includes(data.visibility)) {
+                    data.visibility = 'all';
+                }
                 return data;
             }
         }
@@ -438,6 +442,7 @@ app.get('/api/costume-contest', (req, res) => {
         res.json({
             success: true,
             status: contest.status,
+            visibility: contest.visibility || 'all',
             updatedAt: contest.updatedAt,
             entries: entriesWithVotes,
             totalVotes,
@@ -498,6 +503,26 @@ app.post('/api/costume-contest/status', (req, res) => {
         res.json({ success: true, status: contest.status });
     } catch (err) {
         console.error('[Costume Contest] Status POST error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/costume-contest/visibility', (req, res) => {
+    try {
+        const { visibility } = req.body;
+        if (!['all', 'staff', 'none'].includes(visibility)) {
+            return res.status(400).json({ success: false, error: 'Invalid visibility. Must be "all", "staff", or "none".' });
+        }
+
+        const contest = getStoredCostumeContest();
+        contest.visibility = visibility;
+        contest.updatedAt = new Date().toISOString();
+        saveStoredCostumeContest(contest);
+
+        console.log(`[Costume Contest] Visibility changed to: ${visibility}`);
+        res.json({ success: true, visibility: contest.visibility });
+    } catch (err) {
+        console.error('[Costume Contest] Visibility POST error:', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
