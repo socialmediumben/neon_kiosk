@@ -165,6 +165,29 @@ const saveStoredPortalPhotos = (photos) => {
     }
 };
 
+// Universal NFC / RFID Tap Card Normalization
+function normalizeNfcTapCard(raw) {
+    if (!raw) return '';
+    const clean = String(raw).trim();
+    if (/^\d{8,10}$/.test(clean)) return clean;
+    const byteParts = clean.split(/[:\-\s]+/);
+    if (byteParts.length >= 4 && byteParts.every(p => /^[0-9a-fA-F]{1,2}$/.test(p))) {
+        const hex4Reverse = byteParts.slice(0, 4).reverse().map(p => p.padStart(2, '0')).join('');
+        const dec = parseInt(hex4Reverse, 16);
+        if (!isNaN(dec)) return dec.toString();
+    }
+    if (/^[0-9a-fA-F]{14}$/.test(clean)) {
+        const b0 = clean.substring(0, 2), b1 = clean.substring(2, 4), b2 = clean.substring(4, 6), b3 = clean.substring(6, 8);
+        const dec = parseInt(b3 + b2 + b1 + b0, 16);
+        if (!isNaN(dec)) return dec.toString();
+    }
+    if (/^[0-9a-fA-F]{8}$/.test(clean)) {
+        const dec = parseInt(clean, 16);
+        if (!isNaN(dec)) return dec.toString();
+    }
+    return clean;
+}
+
 app.get('/api/portal-photos', (req, res) => {
     try {
         const { cardId, limit } = req.query;
@@ -172,7 +195,41 @@ app.get('/api/portal-photos', (req, res) => {
 
         if (cardId) {
             const cleanCard = String(cardId).trim().toLowerCase();
-            photos = photos.filter(p => String(p.cardId || '').trim().toLowerCase() === cleanCard);
+            const normCard = normalizeNfcTapCard(cleanCard).toLowerCase();
+            let hexCard = '';
+            let decCard = '';
+            if (/^\d+$/.test(cleanCard)) {
+                try { hexCard = Number(cleanCard).toString(16).toLowerCase(); } catch (_) {}
+                decCard = cleanCard;
+            } else if (/^[0-9a-fA-F]+$/.test(cleanCard)) {
+                hexCard = cleanCard;
+                try {
+                    const parsed = parseInt(cleanCard, 16);
+                    if (!isNaN(parsed)) decCard = parsed.toString();
+                } catch (_) {}
+            }
+
+            const candidateIds = new Set([cleanCard, normCard, hexCard, decCard].filter(Boolean));
+
+            photos = photos.filter(p => {
+                const pRaw = String(p.cardId || '').trim().toLowerCase();
+                if (!pRaw) return false;
+                if (candidateIds.has(pRaw)) return true;
+                const pNorm = normalizeNfcTapCard(pRaw).toLowerCase();
+                if (candidateIds.has(pNorm)) return true;
+                if (/^\d+$/.test(pRaw)) {
+                    try {
+                        const pHex = Number(pRaw).toString(16).toLowerCase();
+                        if (candidateIds.has(pHex)) return true;
+                    } catch (_) {}
+                } else if (/^[0-9a-fA-F]+$/.test(pRaw)) {
+                    try {
+                        const pDec = parseInt(pRaw, 16).toString();
+                        if (candidateIds.has(pDec)) return true;
+                    } catch (_) {}
+                }
+                return false;
+            });
         }
 
         // Sort descending by timestamp (newest first)
@@ -196,23 +253,31 @@ app.post('/api/portal-photos', (req, res) => {
         }
 
         const photos = getStoredPortalPhotos();
+        const rawCard = cardId ? String(cardId).trim() : '';
+        const normalizedCard = normalizeNfcTapCard(rawCard);
+
         const photoRecord = {
             id: 'photo_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-            cardId: cardId ? String(cardId).trim() : '',
+            cardId: normalizedCard || rawCard,
+            rawCardId: rawCard,
             url: String(url).trim(),
             fileId: fileId ? String(fileId).trim() : '',
             downloadUrl: downloadUrl ? String(downloadUrl).trim() : (fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : url),
             timestamp: timestamp || new Date().toISOString()
         };
 
-        photos.unshift(photoRecord);
-        // Keep up to 500 recent photos
-        if (photos.length > 500) {
-            photos.splice(500);
+        // Avoid exact duplicates
+        const exists = photos.some(p => p.url === photoRecord.url && p.cardId === photoRecord.cardId);
+        if (!exists) {
+            photos.unshift(photoRecord);
+            // Keep up to 500 recent photos
+            if (photos.length > 500) {
+                photos.splice(500);
+            }
+            saveStoredPortalPhotos(photos);
         }
 
-        saveStoredPortalPhotos(photos);
-        console.log(`[Portal Photos] Stored photo for card "${photoRecord.cardId}": ${photoRecord.url}`);
+        console.log(`[Portal Photos] Stored photo for card "${photoRecord.cardId}" (raw: "${rawCard}"): ${photoRecord.url}`);
         res.json({ success: true, photo: photoRecord });
     } catch (err) {
         console.error('[Portal Photos] POST error:', err);
