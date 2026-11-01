@@ -409,6 +409,7 @@ const saveStoredCostumeContest = (data) => {
 
 app.get('/api/costume-contest', (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         const contest = getStoredCostumeContest();
         const isDev = req.query.dev === 'true' || req.query.isDev === 'true';
         const voterId = req.query.voterId ? String(req.query.voterId).trim() : null;
