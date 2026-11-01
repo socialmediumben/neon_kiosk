@@ -188,10 +188,76 @@ function normalizeNfcTapCard(raw) {
     return clean;
 }
 
-app.get('/api/portal-photos', (req, res) => {
+const GOOGLE_SHEET_PHOTOBOOTH_CSV_URL = 'https://docs.google.com/spreadsheets/d/1vwXuw-TBYxUXKXUSipa2drArRNXZuKNwbXFhxcVbIc0/gviz/tq?tqx=out:csv&sheet=Photobooth_Photos';
+
+// Sync photos from Google Sheet Photobooth_Photos tab into memory/file cache
+let lastSheetSync = 0;
+async function syncPortalPhotosFromSheet(force = false) {
+    const now = Date.now();
+    if (!force && now - lastSheetSync < 60000) return; // cache for 1 minute
+    lastSheetSync = now;
+
+    try {
+        const res = await fetch(`${GOOGLE_SHEET_PHOTOBOOTH_CSV_URL}&t=${now}`);
+        if (!res.ok) return;
+        const text = await res.text();
+        if (!text || text.length < 20) return;
+
+        const lines = text.split(/\r?\n/).filter(Boolean);
+        if (lines.length < 2) return;
+
+        const headerLine = lines[0].toLowerCase();
+        if (!headerLine.includes('card') && !headerLine.includes('image')) return;
+
+        const stored = getStoredPortalPhotos();
+        const map = new Map();
+        stored.forEach(p => { if (p && p.url) map.set(p.url, p); });
+
+        for (let i = 1; i < lines.length; i++) {
+            const row = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
+            if (!row || row.length < 5) continue;
+            const cleanFields = row.map(f => f.replace(/^"|"$/g, '').trim());
+
+            const timestamp = cleanFields[0] || new Date().toISOString();
+            const cardId = cleanFields[1] || '';
+            const url = cleanFields[4] || '';
+            const fileId = cleanFields[5] || '';
+
+            if (url && url.startsWith('http') && !map.has(url)) {
+                map.set(url, {
+                    id: fileId || `photo_${Date.now()}_${i}`,
+                    cardId: normalizeNfcTapCard(cardId) || cardId,
+                    rawCardId: cardId,
+                    url: url,
+                    fileId: fileId,
+                    downloadUrl: fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : url,
+                    timestamp: timestamp
+                });
+            }
+        }
+
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        saveStoredPortalPhotos(merged);
+        console.log(`[Portal Photos] Synced from Google Sheet: ${merged.length} photos total.`);
+    } catch (err) {
+        console.warn('[Portal Photos] Sheet sync error:', err.message);
+    }
+}
+
+app.get('/api/portal-photos', async (req, res) => {
     try {
         const { cardId, limit } = req.query;
         let photos = getStoredPortalPhotos();
+
+        // If local cache is empty, automatically rehydrate from Google Sheet
+        if (photos.length === 0) {
+            await syncPortalPhotosFromSheet(true);
+            photos = getStoredPortalPhotos();
+        } else {
+            // Background periodic sync
+            syncPortalPhotosFromSheet(false).catch(() => {});
+        }
 
         if (cardId) {
             const cleanCard = String(cardId).trim().toLowerCase();
