@@ -206,8 +206,18 @@ async function syncPortalPhotosFromSheet(force = false) {
         const lines = text.split(/\r?\n/).filter(Boolean);
         if (lines.length < 2) return;
 
-        const headerLine = lines[0].toLowerCase();
-        if (!headerLine.includes('card') && !headerLine.includes('image')) return;
+        const headerRow = lines[0].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
+        let timeIdx = 0, cardIdx = 1, titleIdx = 2, urlIdx = 4, fileIdx = 5;
+        if (headerRow && headerRow.length >= 5) {
+            headerRow.forEach((h, idx) => {
+                const norm = String(h || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (norm.includes('time') || norm.includes('date')) timeIdx = idx;
+                else if (norm.includes('card') || norm === 'id') cardIdx = idx;
+                else if (norm.includes('title') || norm.includes('name')) titleIdx = idx;
+                else if (norm.includes('url') || norm.includes('image') || norm.includes('link')) urlIdx = idx;
+                else if (norm.includes('file')) fileIdx = idx;
+            });
+        }
 
         const stored = getStoredPortalPhotos();
         const map = new Map();
@@ -215,36 +225,39 @@ async function syncPortalPhotosFromSheet(force = false) {
 
         for (let i = 1; i < lines.length; i++) {
             const row = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
-            if (!row || row.length < 5) continue;
+            if (!row || row.length < Math.min(urlIdx + 1, 5)) continue;
             const cleanFields = row.map(f => f.replace(/^"|"$/g, '').trim());
 
-            const timestamp = cleanFields[0] || new Date().toISOString();
-            const cardId = cleanFields[1] || '';
-            let url = cleanFields[4] || '';
-            let fileId = cleanFields[5] || '';
+            const timestamp = cleanFields[timeIdx] || new Date().toISOString();
+            const rawCardField = cleanFields[cardIdx] || '';
+            let url = cleanFields[urlIdx] || '';
+            let fileId = cleanFields[fileIdx] || '';
 
             // Automatically normalize Google Drive share links to high-speed direct image links
             const driveMatch = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)([a-zA-Z0-9_-]+)/);
             if (driveMatch && driveMatch[1]) {
                 if (!fileId) fileId = driveMatch[1];
                 url = `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+            } else if (!url.startsWith('http') && fileId) {
+                url = `https://lh3.googleusercontent.com/d/${fileId}`;
             }
 
             if (url && url.startsWith('http')) {
-                const normCard = normalizeNfcTapCard(cardId) || cardId;
+                // Split multiple card IDs by comma, semicolon, pipe, slash, or whitespace
+                const tokens = rawCardField.split(/[,;|\/\s]+/).map(t => t.trim()).filter(Boolean);
+                const normalizedTokens = tokens.map(t => normalizeNfcTapCard(t) || t);
+
                 const existing = map.get(url);
-                // Insert or update with latest Card ID from Google Sheet
-                if (!existing || (!existing.cardId && normCard) || (existing.cardId !== normCard && normCard)) {
-                    map.set(url, {
-                        id: fileId || (existing?.id) || `photo_${Date.now()}_${i}`,
-                        cardId: normCard,
-                        rawCardId: cardId,
-                        url: url,
-                        fileId: fileId || (existing?.fileId) || '',
-                        downloadUrl: fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : url,
-                        timestamp: timestamp
-                    });
-                }
+                map.set(url, {
+                    id: fileId || (existing?.id) || `photo_${Date.now()}_${i}`,
+                    cardId: normalizedTokens.join(', ') || rawCardField,
+                    rawCardId: rawCardField,
+                    cardIds: normalizedTokens.length > 0 ? normalizedTokens : (rawCardField ? [rawCardField] : []),
+                    url: url,
+                    fileId: fileId || (existing?.fileId) || '',
+                    downloadUrl: fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : url,
+                    timestamp: timestamp
+                });
             }
         }
 
@@ -259,6 +272,7 @@ async function syncPortalPhotosFromSheet(force = false) {
 
 app.get('/api/portal-photos', async (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         const { cardId, limit } = req.query;
         let photos = getStoredPortalPhotos();
 
@@ -290,21 +304,35 @@ app.get('/api/portal-photos', async (req, res) => {
             const candidateIds = new Set([cleanCard, normCard, hexCard, decCard].filter(Boolean));
 
             photos = photos.filter(p => {
-                const pRaw = String(p.cardId || '').trim().toLowerCase();
-                if (!pRaw) return false;
-                if (candidateIds.has(pRaw)) return true;
-                const pNorm = normalizeNfcTapCard(pRaw).toLowerCase();
-                if (candidateIds.has(pNorm)) return true;
-                if (/^\d+$/.test(pRaw)) {
-                    try {
-                        const pHex = Number(pRaw).toString(16).toLowerCase();
-                        if (candidateIds.has(pHex)) return true;
-                    } catch (_) {}
-                } else if (/^[0-9a-fA-F]+$/.test(pRaw)) {
-                    try {
-                        const pDec = parseInt(pRaw, 16).toString();
-                        if (candidateIds.has(pDec)) return true;
-                    } catch (_) {}
+                const rawCards = String(p.rawCardId || p.cardId || '').trim();
+                if (!rawCards && (!p.cardIds || p.cardIds.length === 0)) return false;
+
+                const tokens = new Set();
+                rawCards.split(/[,;|\/\s]+/).map(t => t.trim()).filter(Boolean).forEach(t => tokens.add(t));
+                if (Array.isArray(p.cardIds)) {
+                    p.cardIds.forEach(c => {
+                        if (c) String(c).split(/[,;|\/\s]+/).map(t => t.trim()).filter(Boolean).forEach(t => tokens.add(t));
+                    });
+                }
+
+                for (const tok of tokens) {
+                    const cleanTok = tok.toLowerCase();
+                    if (candidateIds.has(cleanTok)) return true;
+
+                    const normTok = normalizeNfcTapCard(cleanTok).toLowerCase();
+                    if (candidateIds.has(normTok)) return true;
+
+                    if (/^\d+$/.test(cleanTok)) {
+                        try {
+                            const hex = Number(cleanTok).toString(16).toLowerCase();
+                            if (candidateIds.has(hex)) return true;
+                        } catch (_) {}
+                    } else if (/^[0-9a-fA-F]+$/.test(cleanTok)) {
+                        try {
+                            const dec = parseInt(cleanTok, 16).toString();
+                            if (candidateIds.has(dec)) return true;
+                        } catch (_) {}
+                    }
                 }
                 return false;
             });
