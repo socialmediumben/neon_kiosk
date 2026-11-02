@@ -461,7 +461,7 @@ async function syncGameRoomMediaFromSheet(force = false) {
                 const lines = text.split(/\r?\n/).filter(Boolean);
                 if (lines.length >= 2) {
                     const headerRow = lines[0].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
-                    let timeIdx = 0, cardIdx = 1, titleIdx = 2, typeIdx = 3, screenIdx = 4, urlIdx = 5, fileIdx = 6, uploaderIdx = 7;
+                    let timeIdx = 0, cardIdx = 1, titleIdx = 2, typeIdx = 3, screenIdx = 4, urlIdx = 5, fileIdx = 6, uploaderIdx = 7, visIdx = 8;
                     if (headerRow && headerRow.length >= 6) {
                         headerRow.forEach((h, idx) => {
                             const norm = String(h || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -473,6 +473,7 @@ async function syncGameRoomMediaFromSheet(force = false) {
                             else if (norm.includes('url') || norm.includes('link') || norm.includes('media') || norm.includes('image')) urlIdx = idx;
                             else if (norm.includes('file')) fileIdx = idx;
                             else if (norm.includes('uploader') || norm.includes('author') || norm.includes('member')) uploaderIdx = idx;
+                            else if (norm.includes('visibility') || norm.includes('scope') || norm.includes('private')) visIdx = idx;
                         });
                     }
 
@@ -493,6 +494,8 @@ async function syncGameRoomMediaFromSheet(force = false) {
                         let url = cleanFields[urlIdx] || '';
                         let fileId = cleanFields[fileIdx] || '';
                         const uploaderName = cleanFields[uploaderIdx] || '';
+                        let visibility = String(cleanFields[visIdx] || 'public').toLowerCase().trim();
+                        if (visibility !== 'private') visibility = 'public';
 
                         const driveMatch = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)([a-zA-Z0-9_-]+)/);
                         if (driveMatch && driveMatch[1]) {
@@ -513,6 +516,7 @@ async function syncGameRoomMediaFromSheet(force = false) {
                             url: url || (fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : ''),
                             downloadUrl: fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : url,
                             uploaderName,
+                            visibility,
                             timestamp
                         });
                     }
@@ -524,7 +528,7 @@ async function syncGameRoomMediaFromSheet(force = false) {
         }
 
         // 2. Apps Script Web App sync
-        const appsScriptRes = await fetch(`https://script.google.com/macros/s/AKfycbw8sI54Tsza9NwwLd-Id3DgGBg69L4N0VxwSp9d3_dryLdSB5CvmPGtPpzt2uymKRjwcQ/exec?action=gameroom_media&t=${now}`);
+        const appsScriptRes = await fetch(`https://script.google.com/macros/s/AKfycbw8sI54Tsza9NwwLd-Id3DgGBg69L4N0VxwSp9d3_dryLdSB5CvmPGtPpzt2uymKRjwcQ/exec?action=gameroom_media&all=true&t=${now}`);
         if (appsScriptRes.ok) {
             const asData = await appsScriptRes.json();
             if (asData && Array.isArray(asData.items) && asData.items.length > 0) {
@@ -547,7 +551,7 @@ async function syncGameRoomMediaFromSheet(force = false) {
 app.get('/api/gameroom-media', async (req, res) => {
     try {
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        const { cardId, refresh } = req.query;
+        const { cardId, refresh, dev, scope } = req.query;
         if (refresh === 'true') {
             await syncGameRoomMediaFromSheet(true);
         } else {
@@ -555,15 +559,25 @@ app.get('/api/gameroom-media', async (req, res) => {
         }
 
         let items = getStoredGameRoomMedia();
-        if (cardId) {
-            const cleanCard = String(cardId).trim();
-            const normCard = normalizeNfcTapCard(cleanCard);
-            items = items.filter(item => {
-                if (!item.cardId) return false;
-                const tokens = item.cardId.split(/[,;\s]+/).map(t => normalizeNfcTapCard(t.trim()) || t.trim());
-                return tokens.includes(cleanCard) || tokens.includes(normCard) || item.cardId === cleanCard || item.cardId === normCard;
-            });
-        }
+        const cleanCard = cardId ? String(cardId).trim() : '';
+        const normCard = cleanCard ? (normalizeNfcTapCard(cleanCard) || cleanCard) : '';
+        const isDev = dev === 'true';
+
+        // Filter based on visibility
+        items = items.filter(item => {
+            const isPrivate = item.visibility === 'private';
+            const itemTokens = (item.cardId || '').split(/[,;\s]+/).map(t => normalizeNfcTapCard(t.trim()) || t.trim());
+            const isOwner = Boolean(cleanCard && (itemTokens.includes(cleanCard) || itemTokens.includes(normCard) || item.cardId === cleanCard || item.cardId === normCard));
+
+            if (scope === 'mine') {
+                return isOwner;
+            }
+
+            if (isPrivate) {
+                return isOwner || isDev;
+            }
+            return true;
+        });
 
         res.json({ success: true, count: items.length, items });
     } catch (err) {
@@ -574,11 +588,13 @@ app.get('/api/gameroom-media', async (req, res) => {
 
 app.post('/api/gameroom-media', async (req, res) => {
     try {
-        const { cardId, uploaderName, title, type, targetScreen, file, image, data, fileName, mimeType } = req.body;
+        const { cardId, uploaderName, title, type, targetScreen, visibility, file, image, data, fileName, mimeType } = req.body;
         const fileData = file || image || data;
         if (!fileData) {
             return res.status(400).json({ success: false, error: 'File data is required.' });
         }
+
+        const effectiveVisibility = (visibility === 'private') ? 'private' : 'public';
 
         // Forward to Google Apps Script Web App
         const appsScriptRes = await fetch('https://script.google.com/macros/s/AKfycbw8sI54Tsza9NwwLd-Id3DgGBg69L4N0VxwSp9d3_dryLdSB5CvmPGtPpzt2uymKRjwcQ/exec', {
@@ -591,6 +607,7 @@ app.post('/api/gameroom-media', async (req, res) => {
                 title: title || '',
                 type: type || 'map',
                 targetScreen: targetScreen || 'table',
+                visibility: effectiveVisibility,
                 file: fileData,
                 fileName: fileName || '',
                 mimeType: mimeType || 'image/jpeg',
