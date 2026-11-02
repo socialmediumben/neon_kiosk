@@ -468,12 +468,12 @@ async function syncGameRoomMediaFromSheet(force = false) {
                             const norm = String(h || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                             if (norm.includes('time') || norm.includes('date')) timeIdx = idx;
                             else if (norm.includes('card') || norm === 'id') cardIdx = idx;
-                            else if (norm.includes('title') || norm.includes('name')) titleIdx = idx;
+                            else if (norm.includes('uploader') || norm.includes('author') || norm.includes('member')) uploaderIdx = idx;
+                            else if (norm.includes('title') || norm === 'name') titleIdx = idx;
                             else if (norm.includes('type')) typeIdx = idx;
                             else if (norm.includes('screen') || norm.includes('target')) screenIdx = idx;
                             else if (norm.includes('url') || norm.includes('link') || norm.includes('media') || norm.includes('image')) urlIdx = idx;
                             else if (norm.includes('file')) fileIdx = idx;
-                            else if (norm.includes('uploader') || norm.includes('author') || norm.includes('member')) uploaderIdx = idx;
                             else if (norm.includes('visibility') || norm.includes('scope') || norm.includes('private')) visIdx = idx;
                         });
                     }
