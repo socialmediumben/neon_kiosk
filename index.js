@@ -480,7 +480,9 @@ async function syncGameRoomMediaFromSheet(force = false) {
 
                     const stored = getStoredGameRoomMedia();
                     const map = new Map();
-                    stored.forEach(item => { if (item && (item.fileId || item.url)) map.set(item.fileId || item.url, item); });
+                    if (!force) {
+                        stored.forEach(item => { if (item && (item.fileId || item.url)) map.set(item.fileId || item.url, item); });
+                    }
 
                     for (let i = 1; i < lines.length; i++) {
                         const row = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
@@ -538,7 +540,13 @@ async function syncGameRoomMediaFromSheet(force = false) {
                 stored.forEach(i => { if (i && (i.fileId || i.url)) map.set(i.fileId || i.url, i); });
                 asData.items.forEach(asItem => {
                     const key = asItem.fileId || asItem.url;
-                    if (key) map.set(key, { ...map.get(key), ...asItem });
+                    if (key) {
+                        const existing = map.get(key) || {};
+                        const safeTitle = (existing.title && existing.title !== asItem.uploaderName)
+                            ? existing.title
+                            : (asItem.title && asItem.title !== asItem.uploaderName ? asItem.title : (existing.title || asItem.title || 'Custom Battlemap'));
+                        map.set(key, { ...existing, ...asItem, title: safeTitle });
+                    }
                 });
                 const merged = Array.from(map.values()).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
                 saveStoredGameRoomMedia(merged);
