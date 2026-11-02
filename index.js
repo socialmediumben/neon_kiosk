@@ -420,6 +420,228 @@ app.post('/api/portal-photos', (req, res) => {
 });
 
 // ============================================================================
+// Game Room Media API (Google Drive "Game Room Media" & Sheets "Game_Room_Media")
+// ============================================================================
+const GOOGLE_SHEET_GAMEROOM_CSV_URL = 'https://docs.google.com/spreadsheets/d/1vwXuw-TBYxUXKXUSipa2drArRNXZuKNwbXFhxcVbIc0/gviz/tq?tqx=out:csv&sheet=Game_Room_Media';
+const GAMEROOM_MEDIA_FILE = path.join(__dirname, 'gameroom_media.json');
+
+function getStoredGameRoomMedia() {
+    try {
+        if (fs.existsSync(GAMEROOM_MEDIA_FILE)) {
+            const data = fs.readFileSync(GAMEROOM_MEDIA_FILE, 'utf-8');
+            const parsed = JSON.parse(data);
+            return Array.isArray(parsed) ? parsed : [];
+        }
+    } catch (err) {
+        console.warn('[Game Room Media] Error reading gameroom_media.json:', err.message);
+    }
+    return [];
+}
+
+function saveStoredGameRoomMedia(items) {
+    try {
+        fs.writeFileSync(GAMEROOM_MEDIA_FILE, JSON.stringify(items, null, 2), 'utf-8');
+    } catch (err) {
+        console.warn('[Game Room Media] Error writing gameroom_media.json:', err.message);
+    }
+}
+
+let lastGameRoomSheetSync = 0;
+async function syncGameRoomMediaFromSheet(force = false) {
+    const now = Date.now();
+    if (!force && now - lastGameRoomSheetSync < 60000) return;
+    lastGameRoomSheetSync = now;
+
+    try {
+        // 1. GViz CSV sync
+        const res = await fetch(`${GOOGLE_SHEET_GAMEROOM_CSV_URL}&t=${now}`);
+        if (res.ok) {
+            const text = await res.text();
+            if (text && text.length > 20) {
+                const lines = text.split(/\r?\n/).filter(Boolean);
+                if (lines.length >= 2) {
+                    const headerRow = lines[0].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
+                    let timeIdx = 0, cardIdx = 1, titleIdx = 2, typeIdx = 3, screenIdx = 4, urlIdx = 5, fileIdx = 6, uploaderIdx = 7;
+                    if (headerRow && headerRow.length >= 6) {
+                        headerRow.forEach((h, idx) => {
+                            const norm = String(h || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                            if (norm.includes('time') || norm.includes('date')) timeIdx = idx;
+                            else if (norm.includes('card') || norm === 'id') cardIdx = idx;
+                            else if (norm.includes('title') || norm.includes('name')) titleIdx = idx;
+                            else if (norm.includes('type')) typeIdx = idx;
+                            else if (norm.includes('screen') || norm.includes('target')) screenIdx = idx;
+                            else if (norm.includes('url') || norm.includes('link') || norm.includes('media') || norm.includes('image')) urlIdx = idx;
+                            else if (norm.includes('file')) fileIdx = idx;
+                            else if (norm.includes('uploader') || norm.includes('author') || norm.includes('member')) uploaderIdx = idx;
+                        });
+                    }
+
+                    const stored = getStoredGameRoomMedia();
+                    const map = new Map();
+                    stored.forEach(item => { if (item && (item.fileId || item.url)) map.set(item.fileId || item.url, item); });
+
+                    for (let i = 1; i < lines.length; i++) {
+                        const row = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
+                        if (!row || row.length < Math.min(urlIdx + 1, 6)) continue;
+                        const cleanFields = row.map(f => f.replace(/^"|"$/g, '').trim());
+
+                        const timestamp = cleanFields[timeIdx] || new Date().toISOString();
+                        const rawCard = cleanFields[cardIdx] || '';
+                        const title = cleanFields[titleIdx] || 'Custom Battlemap';
+                        const type = cleanFields[typeIdx] || 'map';
+                        const targetScreen = cleanFields[screenIdx] || 'table';
+                        let url = cleanFields[urlIdx] || '';
+                        let fileId = cleanFields[fileIdx] || '';
+                        const uploaderName = cleanFields[uploaderIdx] || '';
+
+                        const driveMatch = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)([a-zA-Z0-9_-]+)/);
+                        if (driveMatch && driveMatch[1]) {
+                            if (!fileId) fileId = driveMatch[1];
+                            url = `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+                        }
+
+                        if (!url && !fileId) continue;
+                        const itemKey = fileId || url;
+
+                        map.set(itemKey, {
+                            id: fileId || `gr_${i}`,
+                            fileId,
+                            cardId: rawCard,
+                            title,
+                            type,
+                            targetScreen,
+                            url: url || (fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : ''),
+                            downloadUrl: fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : url,
+                            uploaderName,
+                            timestamp
+                        });
+                    }
+
+                    const merged = Array.from(map.values()).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+                    saveStoredGameRoomMedia(merged);
+                }
+            }
+        }
+
+        // 2. Apps Script Web App sync
+        const appsScriptRes = await fetch(`https://script.google.com/macros/s/AKfycbw8sI54Tsza9NwwLd-Id3DgGBg69L4N0VxwSp9d3_dryLdSB5CvmPGtPpzt2uymKRjwcQ/exec?action=gameroom_media&t=${now}`);
+        if (appsScriptRes.ok) {
+            const asData = await appsScriptRes.json();
+            if (asData && Array.isArray(asData.items) && asData.items.length > 0) {
+                const stored = getStoredGameRoomMedia();
+                const map = new Map();
+                stored.forEach(i => { if (i && (i.fileId || i.url)) map.set(i.fileId || i.url, i); });
+                asData.items.forEach(asItem => {
+                    const key = asItem.fileId || asItem.url;
+                    if (key) map.set(key, { ...map.get(key), ...asItem });
+                });
+                const merged = Array.from(map.values()).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+                saveStoredGameRoomMedia(merged);
+            }
+        }
+    } catch (err) {
+        console.warn('[Game Room Media] Sheet sync error:', err.message);
+    }
+}
+
+app.get('/api/gameroom-media', async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        const { cardId, refresh } = req.query;
+        if (refresh === 'true') {
+            await syncGameRoomMediaFromSheet(true);
+        } else {
+            syncGameRoomMediaFromSheet(false).catch(() => {});
+        }
+
+        let items = getStoredGameRoomMedia();
+        if (cardId) {
+            const cleanCard = String(cardId).trim();
+            const normCard = normalizeNfcTapCard(cleanCard);
+            items = items.filter(item => {
+                if (!item.cardId) return false;
+                const tokens = item.cardId.split(/[,;\s]+/).map(t => normalizeNfcTapCard(t.trim()) || t.trim());
+                return tokens.includes(cleanCard) || tokens.includes(normCard) || item.cardId === cleanCard || item.cardId === normCard;
+            });
+        }
+
+        res.json({ success: true, count: items.length, items });
+    } catch (err) {
+        console.error('[Game Room Media] GET error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.post('/api/gameroom-media', async (req, res) => {
+    try {
+        const { cardId, uploaderName, title, type, targetScreen, file, image, data, fileName, mimeType } = req.body;
+        const fileData = file || image || data;
+        if (!fileData) {
+            return res.status(400).json({ success: false, error: 'File data is required.' });
+        }
+
+        // Forward to Google Apps Script Web App
+        const appsScriptRes = await fetch('https://script.google.com/macros/s/AKfycbw8sI54Tsza9NwwLd-Id3DgGBg69L4N0VxwSp9d3_dryLdSB5CvmPGtPpzt2uymKRjwcQ/exec', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'upload_gameroom_media',
+                cardId: cardId ? String(cardId).trim() : '',
+                uploaderName: uploaderName || '',
+                title: title || '',
+                type: type || 'map',
+                targetScreen: targetScreen || 'table',
+                file: fileData,
+                fileName: fileName || '',
+                mimeType: mimeType || 'image/jpeg',
+                timestamp: new Date().toISOString()
+            })
+        });
+
+        const asResult = await appsScriptRes.json();
+        if (asResult.status === 'success' && asResult.item) {
+            const items = getStoredGameRoomMedia();
+            items.unshift(asResult.item);
+            saveStoredGameRoomMedia(items);
+            return res.json({ success: true, item: asResult.item });
+        } else {
+            return res.status(500).json({ success: false, error: asResult.message || 'Google Drive upload failed.' });
+        }
+    } catch (err) {
+        console.error('[Game Room Media] POST error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+app.delete('/api/gameroom-media/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!id) {
+            return res.status(400).json({ success: false, error: 'Media ID is required.' });
+        }
+
+        // Forward to Google Apps Script Web App
+        const appsScriptRes = await fetch('https://script.google.com/macros/s/AKfycbw8sI54Tsza9NwwLd-Id3DgGBg69L4N0VxwSp9d3_dryLdSB5CvmPGtPpzt2uymKRjwcQ/exec', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'delete_gameroom_media',
+                id
+            })
+        });
+
+        const asResult = await appsScriptRes.json();
+        const items = getStoredGameRoomMedia().filter(i => i.id !== id && i.fileId !== id);
+        saveStoredGameRoomMedia(items);
+
+        res.json({ success: true, result: asResult });
+    } catch (err) {
+        console.error('[Game Room Media] DELETE error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ============================================================================
 // Costume Contest API (Portal Door Photobooth & Social Medium App Module)
 // ============================================================================
 const COSTUME_CONTEST_FILE = path.join(__dirname, 'costume_contest.json');
