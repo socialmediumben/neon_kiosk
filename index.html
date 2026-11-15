@@ -158,15 +158,34 @@
         }
 
         /* Buddy Mascot Profile Showcase */
+        .buddy-nametag-container {
+            display: flex;
+            flex-direction: row;
+            align-items: stretch;
+            justify-content: flex-start;
+            gap: 18px;
+            width: 100%;
+            margin-bottom: 18px;
+        }
+        .buddy-nametag-container.centered {
+            justify-content: center;
+        }
+        @media (max-width: 768px) {
+            .buddy-nametag-container {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
         .profile-buddy-showcase {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            width: 100%;
-            max-width: 440px;
-            margin: 0 auto 16px auto;
-            padding: 16px 14px;
+            justify-content: space-between;
+            width: 210px;
+            min-width: 190px;
+            max-width: 230px;
+            margin: 0;
+            padding: 14px 12px;
             background: radial-gradient(circle at center, rgba(59, 192, 205, 0.12) 0%, rgba(248, 250, 252, 0.95) 85%);
             border: 1.5px solid rgba(59, 192, 205, 0.35);
             border-radius: 18px;
@@ -175,8 +194,8 @@
         }
         .profile-buddy-stage-wrapper {
             position: relative;
-            width: 140px;
-            height: 140px;
+            width: 124px;
+            height: 124px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -515,8 +534,10 @@
         </div>
 
         <div id="stage-confirm" class="stage">
-            <div id="buddy-confirm-preview" class="no-print mb-4"></div>
-            <div id="nametag-confirm-preview" class="mb-8"></div>
+            <div class="buddy-nametag-container centered mb-8">
+                <div id="buddy-confirm-preview" class="no-print"></div>
+                <div id="nametag-confirm-preview"></div>
+            </div>
             <div id="action-area"></div>
             <button onclick="showStage('stage-search')" class="mt-8 text-gray-400 font-semibold hover:underline">Start Over</button>
         </div>
@@ -531,8 +552,10 @@
                     </div>
                     <p class="text-xl text-gray-600" id="success-msg"></p>
                     
-                    <div id="buddy-final-preview" class="no-print mb-4"></div>
-                    <div id="nametag-final-preview"></div>
+                    <div class="buddy-nametag-container mb-4">
+                        <div id="buddy-final-preview" class="no-print"></div>
+                        <div id="nametag-final-preview"></div>
+                    </div>
                     
                     <div id="link-card-container" class="bg-slate-50 p-6 rounded-2xl border border-slate-200 no-print hidden">
                         <!-- Loaded dynamically -->

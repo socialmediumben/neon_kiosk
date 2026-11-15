@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-14T21:50:00.000Z",
+  "updatedAt": "2026-11-15T20:52:16.958Z",
   "brandLogo": null,
   "moduleVisibility": {
     "costumeContest": "none",
@@ -101,9 +101,9 @@
   "storeSettings": {
     "donationFormUrl": "https://socialmedium.app.neoncrm.com/forms/store-donation-form",
     "balanceFieldId": "119",
-    "xpFieldId": "120",
-    "buddyAvatarFieldId": "",
-    "buddyBucksFieldId": ""
+    "xpFieldId": "122",
+    "buddyAvatarFieldId": "120",
+    "buddyBucksFieldId": "121"
   },
   "buddyAssets": []
 }
