@@ -15,7 +15,88 @@
     "updatedBy": "system"
   },
   "xpRules": null,
-  "levelTiers": null,
+  "levelTiers": [
+    {
+      "level": 1,
+      "title": "Level 1",
+      "minXp": 0,
+      "badgeEmoji": "🌱",
+      "reward": "50",
+      "description": "Beginner steps into the makerspace community"
+    },
+    {
+      "level": 2,
+      "title": "Level 2",
+      "minXp": 50,
+      "badgeEmoji": "🔨",
+      "reward": "25",
+      "description": "Learning the tools and building familiarity"
+    },
+    {
+      "level": 3,
+      "title": "Level 3",
+      "minXp": 250,
+      "badgeEmoji": "⚙️",
+      "reward": "25",
+      "description": "Regular participant creating great projects"
+    },
+    {
+      "level": 4,
+      "title": "Level 4",
+      "minXp": 500,
+      "badgeEmoji": "🧰",
+      "reward": "50",
+      "description": "Skilled collaborator familiar with makerspace workshops"
+    },
+    {
+      "level": 5,
+      "title": "Level 5",
+      "minXp": 1000,
+      "badgeEmoji": "🎨",
+      "reward": "25",
+      "description": "Experienced creator with specialized fabrication skills"
+    },
+    {
+      "level": 6,
+      "title": "Level 6",
+      "minXp": 1500,
+      "badgeEmoji": "🚀",
+      "reward": "25",
+      "description": "Pillar of the shop helping others succeed"
+    },
+    {
+      "level": 7,
+      "title": "Level 7",
+      "minXp": 2000,
+      "badgeEmoji": "⚡",
+      "reward": "50",
+      "description": "Accomplished technical mastery across space domains"
+    },
+    {
+      "level": 8,
+      "title": "Level 8",
+      "minXp": 5000,
+      "badgeEmoji": "💡",
+      "reward": "100",
+      "description": "Innovator creating advanced, inspiring community works"
+    },
+    {
+      "level": 9,
+      "title": "Level 9",
+      "minXp": 10000,
+      "badgeEmoji": "🔮",
+      "reward": "200",
+      "description": "Legendary maker whose crafts inspire everyone"
+    },
+    {
+      "level": 10,
+      "title": "Level 10",
+      "minXp": 25000,
+      "badgeEmoji": "👑",
+      "reward": "500",
+      "description": "Highest echelon of makerspace mastery and leadership"
+    }
+  ],
   "toolMappings": null,
   "storeSettings": {
     "donationFormUrl": "https://socialmedium.app.neoncrm.com/forms/store-donation-form",

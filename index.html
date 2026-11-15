@@ -157,6 +157,138 @@
             color: #000000 !important;
         }
 
+        /* Buddy Mascot Profile Showcase */
+        .profile-buddy-showcase {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 440px;
+            margin: 0 auto 16px auto;
+            padding: 16px 14px;
+            background: radial-gradient(circle at center, rgba(59, 192, 205, 0.12) 0%, rgba(248, 250, 252, 0.95) 85%);
+            border: 1.5px solid rgba(59, 192, 205, 0.35);
+            border-radius: 18px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+            box-sizing: border-box;
+        }
+        .profile-buddy-stage-wrapper {
+            position: relative;
+            width: 140px;
+            height: 140px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+        }
+        .profile-buddy-stage {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+        .profile-buddy-shadow {
+            position: absolute;
+            bottom: 6%;
+            width: 44%;
+            height: 6%;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.25);
+            filter: blur(3px);
+            z-index: 5;
+            pointer-events: none;
+        }
+        .profile-buddy-layer {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+        .profile-buddy-layer.buddy-base-layer {
+            isolation: isolate;
+        }
+        .profile-buddy-base-img {
+            mix-blend-mode: multiply;
+        }
+        .profile-buddy-color-mask {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            -webkit-mask-size: contain;
+            mask-size: contain;
+            -webkit-mask-repeat: no-repeat;
+            mask-repeat: no-repeat;
+            -webkit-mask-position: center;
+            mask-position: center;
+            transition: background-color 0.3s ease;
+        }
+        .profile-buddy-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+        }
+        .profile-buddy-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+        }
+        .profile-buddy-level-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 700;
+            color: #1e293b;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+        }
+        .buddy-badge-lvl {
+            color: #0891b2;
+            font-weight: 800;
+        }
+        .profile-buddy-stats-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .buddy-stat-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.78em;
+            font-weight: 700;
+        }
+        .buddy-stat-pill.xp-pill {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            color: #d97706;
+        }
+        .buddy-stat-pill.bucks-pill {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: #059669;
+        }
+
         /* Thermal Printer 2" Tall x 3" Wide Print Stylesheet */
         @page {
             size: 3in 2in;
@@ -383,6 +515,7 @@
         </div>
 
         <div id="stage-confirm" class="stage">
+            <div id="buddy-confirm-preview" class="no-print mb-4"></div>
             <div id="nametag-confirm-preview" class="mb-8"></div>
             <div id="action-area"></div>
             <button onclick="showStage('stage-search')" class="mt-8 text-gray-400 font-semibold hover:underline">Start Over</button>
@@ -398,6 +531,7 @@
                     </div>
                     <p class="text-xl text-gray-600" id="success-msg"></p>
                     
+                    <div id="buddy-final-preview" class="no-print mb-4"></div>
                     <div id="nametag-final-preview"></div>
                     
                     <div id="link-card-container" class="bg-slate-50 p-6 rounded-2xl border border-slate-200 no-print hidden">
@@ -447,6 +581,350 @@
         const INTERESTS_FIELD_ID = "81";
         const CUSTOM_INTERESTS_FIELD_ID = "83";
         const CERTIFICATIONS_FIELD_ID = "116";
+        const GOOGLE_SHEET_BASE = "https://docs.google.com/spreadsheets/d/1vwXuw-TBYxUXKXUSipa2drArRNXZuKNwbXFhxcVbIc0/gviz/tq?tqx=out:csv";
+
+        const BUDDY_COLOR_MAP = {
+            cyan: '#3bc0cd',
+            orange: '#f16622',
+            blue: '#344ea2',
+            navy: '#344ea2',
+            purple: '#a855f7',
+            yellow: '#eab308',
+            red: '#ef4444',
+            green: '#10b981',
+            pink: '#ec4899',
+            bubblegum: '#f472b6',
+            lime: '#84cc16',
+            indigo: '#6366f1'
+        };
+
+        const BUDDY_CATEGORY_LAYER_ORDER = {
+            capes: 20,
+            base_body: 30,
+            mouth: 40,
+            expression: 45,
+            tops: 60,
+            bottoms: 65,
+            shoes: 70,
+            face_accessory: 80,
+            headwear: 90,
+            hair: 95,
+            props: 110
+        };
+
+        let globalLevelTiers = [
+            { level: 1, title: 'Level 1', minXp: 0, badgeEmoji: '🌱' },
+            { level: 2, title: 'Level 2', minXp: 50, badgeEmoji: '🔨' },
+            { level: 3, title: 'Level 3', minXp: 250, badgeEmoji: '⚙️' },
+            { level: 4, title: 'Level 4', minXp: 500, badgeEmoji: '🧰' },
+            { level: 5, title: 'Level 5', minXp: 1000, badgeEmoji: '🎨' },
+            { level: 6, title: 'Level 6', minXp: 1500, badgeEmoji: '🚀' },
+            { level: 7, title: 'Level 7', minXp: 2000, badgeEmoji: '⚡' },
+            { level: 8, title: 'Level 8', minXp: 5000, badgeEmoji: '💡' },
+            { level: 9, title: 'Level 9', minXp: 10000, badgeEmoji: '🔮' },
+            { level: 10, title: 'Level 10', minXp: 25000, badgeEmoji: '👑' }
+        ];
+
+        let buddyDatabase = {
+            'sheet_1_basic_buddy': { id: 'sheet_1_basic_buddy', name: 'Basic Buddy', category: 'base_body', assetUrl: 'buddies/basic_buddy.png', zIndex: 30 },
+            'sheet_21_closed_smile': { id: 'sheet_21_closed_smile', name: 'Closed Smile', category: 'mouth', assetUrl: 'buddies/closed_smile.png', zIndex: 40 },
+            'sheet_4_closed_smile': { id: 'sheet_4_closed_smile', name: 'Closed Smile', category: 'mouth', assetUrl: 'buddies/closed_smile.png', zIndex: 40 },
+            'sheet_13_open_mouth': { id: 'sheet_13_open_mouth', name: 'Open Mouth', category: 'mouth', assetUrl: 'buddies/open_mouth.png', zIndex: 40 },
+            'sheet_2_flower': { id: 'sheet_2_flower', name: 'Blossom Flower', category: 'headwear', assetUrl: 'buddies/flower.png', zIndex: 90 },
+            'sheet_3_cat_ears': { id: 'sheet_3_cat_ears', name: 'Cat Ears Headband', category: 'headwear', assetUrl: 'buddies/cat_ears.png', zIndex: 90 },
+            'sheet_5_cyborg_face': { id: 'sheet_5_cyborg_face', name: 'Cyborg Visor', category: 'headwear', assetUrl: 'buddies/cyborg_face.png', zIndex: 90 },
+            'sheet_6_bow_tie': { id: 'sheet_6_bow_tie', name: 'Dapper Bow Tie', category: 'tops', assetUrl: 'buddies/bow_tie.png', zIndex: 60 },
+            'sheet_7_dragon': { id: 'sheet_7_dragon', name: 'Dragon Companion', category: 'props', assetUrl: 'buddies/dragon.png', zIndex: 110 },
+            'sheet_8_game_controller': { id: 'sheet_8_game_controller', name: 'Game Controller', category: 'props', assetUrl: 'buddies/game_controller.png', zIndex: 110 },
+            'sheet_9_laser_pointer': { id: 'sheet_9_laser_pointer', name: 'Laser Pointer', category: 'props', assetUrl: 'buddies/laser_pointer.png', zIndex: 110 },
+            'sheet_10_magical_girl_hair': { id: 'sheet_10_magical_girl_hair', name: 'Magical Girl Hair', category: 'headwear', assetUrl: 'buddies/magical_girl_hair.png', zIndex: 90 },
+            'sheet_11_witch_hat': { id: 'sheet_11_witch_hat', name: 'Magical Hat', category: 'headwear', assetUrl: 'buddies/witch_hat.png', zIndex: 90 },
+            'sheet_12_mic_stand': { id: 'sheet_12_mic_stand', name: 'Microphone', category: 'props', assetUrl: 'buddies/mic_stand.png', zIndex: 110 },
+            'sheet_14_robot': { id: 'sheet_14_robot', name: 'Robot Companion', category: 'props', assetUrl: 'buddies/robot.png', zIndex: 110 },
+            'sheet_15_robot_arm': { id: 'sheet_15_robot_arm', name: 'Robotic Arm', category: 'props', assetUrl: 'buddies/robot_arm.png', zIndex: 110 },
+            'sheet_16_screwdriver': { id: 'sheet_16_screwdriver', name: 'Screwdriver', category: 'props', assetUrl: 'buddies/screwdriver.png', zIndex: 110 },
+            'sheet_17_soda_can': { id: 'sheet_17_soda_can', name: 'Soda Can', category: 'props', assetUrl: 'buddies/soda_can.png', zIndex: 110 },
+            'sheet_18_headphones': { id: 'sheet_18_headphones', name: 'Studio Headphones', category: 'headwear', assetUrl: 'buddies/headphones.png', zIndex: 90 },
+            'sheet_19_sword': { id: 'sheet_19_sword', name: 'Sword', category: 'props', assetUrl: 'buddies/sword.png', zIndex: 110 },
+            'sheet_20_test_tube': { id: 'sheet_20_test_tube', name: 'Test Tube', category: 'props', assetUrl: 'buddies/test_tube.png', zIndex: 110 },
+            'sheet_21_wizard_staff': { id: 'sheet_21_wizard_staff', name: 'Wizard Staff', category: 'props', assetUrl: 'buddies/wizard_staff.png', zIndex: 110 },
+            'sheet_22_apron': { id: 'sheet_22_apron', name: 'Workshop Apron', category: 'tops', assetUrl: 'buddies/apron.png', zIndex: 60 }
+        };
+
+        async function loadGlobalAppSettings() {
+            try {
+                const res = await fetch(`${API_PROXY_URL}/api/app-settings?_t=${Date.now()}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data && data.settings && Array.isArray(data.settings.levelTiers) && data.settings.levelTiers.length > 0) {
+                    globalLevelTiers = data.settings.levelTiers.map(t => ({
+                        level: t.level,
+                        title: t.title || `Level ${t.level}`,
+                        minXp: Number(t.minXp) || 0,
+                        badgeEmoji: t.badgeEmoji || '🌱'
+                    })).sort((a, b) => a.minXp - b.minXp);
+                    console.log("[Kiosk] Synced dynamic Level Tiers from app-settings:", globalLevelTiers.map(t => `${t.level}: ${t.title}`).join(', '));
+                }
+            } catch (e) {
+                console.warn("[Kiosk] Error syncing app-settings:", e);
+            }
+        }
+        loadGlobalAppSettings();
+
+        const escapeHtml = (str) => {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        };
+
+        const hexToRgbNormalized = (hex) => {
+            let clean = String(hex || '#3bc0cd').replace(/[^0-9a-fA-F]/g, '');
+            if (clean.length === 3) {
+                clean = clean.split('').map(c => c + c).join('');
+            }
+            const num = parseInt(clean, 16);
+            if (isNaN(num)) return { r: 0.231, g: 0.753, b: 0.804 };
+            return {
+                r: ((num >> 16) & 255) / 255,
+                g: ((num >> 8) & 255) / 255,
+                b: (num & 255) / 255
+            };
+        };
+
+        const getMakerLevelFromXp = (rawXp) => {
+            const xp = Math.max(0, Math.min(Number(rawXp) >= 1000000 ? 0 : Number(rawXp) || 0, 999999));
+            let tier = globalLevelTiers[0] || { level: 1, title: 'Level 1', minXp: 0, badgeEmoji: '🌱' };
+            for (let i = 0; i < globalLevelTiers.length; i++) {
+                if (xp >= globalLevelTiers[i].minXp) {
+                    tier = globalLevelTiers[i];
+                } else {
+                    break;
+                }
+            }
+            return tier;
+        };
+
+        const resolveBuddyAssetUrl = (url) => {
+            if (!url) return '';
+            const clean = String(url).trim();
+            const driveMatch = clean.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+                               clean.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/) ||
+                               clean.match(/drive\.google\.com\/uc\?id=([a-zA-Z0-9_-]+)/);
+            if (driveMatch && driveMatch[1]) {
+                return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+            }
+            if (clean.startsWith('http://') || clean.startsWith('https://')) {
+                return clean;
+            }
+            const filename = clean.replace(/^\/?(static\/)?(buddies\/)?/, '');
+            return `buddies/${filename}`;
+        };
+
+        const parseCSV = (text) => {
+            const lines = text.split('\n');
+            return lines.map(line => {
+                const row = [];
+                let cur = '', inQ = false;
+                for (let i = 0; i < line.length; i++) {
+                    const c = line[i];
+                    if (c === '"') {
+                        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+                        else { inQ = !inQ; }
+                    } else if (c === ',' && !inQ) {
+                        row.push(cur.trim());
+                        cur = '';
+                    } else { cur += c; }
+                }
+                row.push(cur.trim());
+                return row;
+            });
+        };
+
+        const loadBuddyDatabase = async () => {
+            try {
+                const res = await fetch(`${GOOGLE_SHEET_BASE}&sheet=Buddy_Items&t=${Date.now()}`);
+                if (!res.ok) return;
+                const text = await res.text();
+                const rows = parseCSV(text);
+                if (!rows || rows.length < 2) return;
+
+                const header = rows[0].map(h => String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+                let nameIdx = -1, catIdx = -1, urlIdx = -1, activeIdx = -1;
+                for (let i = 0; i < header.length; i++) {
+                    const col = header[i];
+                    if (col.includes('name') || col.includes('item') || col.includes('title')) nameIdx = i;
+                    else if (col.includes('cat') || col.includes('layer') || col.includes('type')) catIdx = i;
+                    else if (col.includes('url') || col.includes('asset') || col.includes('image') || col.includes('link') || col.includes('file')) urlIdx = i;
+                    else if (col.includes('active') || col.includes('status') || col.includes('enable')) activeIdx = i;
+                }
+
+                if (nameIdx === -1 || urlIdx === -1) return;
+
+                for (let r = 1; r < rows.length; r++) {
+                    const row = rows[r];
+                    if (!row || row.length === 0) continue;
+                    const name = String(row[nameIdx] || '').trim();
+                    if (!name) continue;
+
+                    if (activeIdx !== -1) {
+                        const act = String(row[activeIdx] || '').trim().toLowerCase();
+                        if (['pending', 'false', 'no', '0', 'inactive', 'archived'].includes(act)) continue;
+                    }
+
+                    const cat = catIdx !== -1 ? String(row[catIdx] || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '') : 'other';
+                    let assetUrl = String(row[urlIdx] || '').trim();
+                    if (!assetUrl) continue;
+
+                    const resolvedUrl = resolveBuddyAssetUrl(assetUrl);
+                    const zIndex = BUDDY_CATEGORY_LAYER_ORDER[cat] || 50;
+                    const id = `sheet_${r}_${name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+
+                    buddyDatabase[id] = {
+                        id: id,
+                        name: name,
+                        category: cat,
+                        assetUrl: resolvedUrl,
+                        zIndex: zIndex
+                    };
+                }
+            } catch (err) {
+                console.warn('[Buddy_Items Load Notice]:', err);
+            }
+        };
+        loadBuddyDatabase();
+
+        function renderBuddyAvatarHtml(buddyAvatar, xp = 0, buddyBucks = 0, givenName = 'Maker') {
+            let config = buddyAvatar;
+            if (typeof config === 'string') {
+                try { config = JSON.parse(config); } catch (_) { config = {}; }
+            }
+            if (!config || typeof config !== 'object') config = {};
+
+            const rawColor = String(config.baseColor || 'cyan').toLowerCase();
+            const baseColorHex = rawColor.startsWith('#') ? rawColor : (BUDDY_COLOR_MAP[rawColor] || '#3bc0cd');
+            const equipped = config.equipped || {};
+
+            const layers = [];
+            const baseBodyUrl = 'buddies/basic_buddy.png';
+            const baseBodyId = equipped.base_body || 'sheet_1_basic_buddy';
+            const baseItem = buddyDatabase[baseBodyId] || {
+                id: 'sheet_1_basic_buddy',
+                name: 'Basic Buddy',
+                category: 'base_body',
+                assetUrl: baseBodyUrl,
+                zIndex: 30
+            };
+
+            const allItems = Object.values(buddyDatabase);
+
+            Object.entries(equipped).forEach(([category, itemId]) => {
+                if (!itemId || category === 'base_body') return;
+                let item = buddyDatabase[itemId];
+                if (!item) {
+                    const slug = String(itemId).replace(/^sheet_\d+_/, '').toLowerCase();
+                    item = allItems.find(b => b.id.replace(/^sheet_\d+_/, '').toLowerCase() === slug || b.name.toLowerCase().replace(/[^a-z0-9]/g, '_') === slug);
+                }
+                if (item && item.assetUrl) {
+                    layers.push(item);
+                } else if (String(itemId).startsWith('http') || String(itemId).startsWith('/')) {
+                    layers.push({
+                        id: String(itemId),
+                        name: category,
+                        category: category,
+                        assetUrl: resolveBuddyAssetUrl(itemId),
+                        zIndex: BUDDY_CATEGORY_LAYER_ORDER[category] || 50
+                    });
+                }
+            });
+
+            layers.sort((a, b) => (a.zIndex || 50) - (b.zIndex || 50));
+
+            const accessoriesHtml = layers.map(l => `
+                <div class="profile-buddy-layer" style="z-index: ${l.zIndex || 50};">
+                    <img class="profile-buddy-img" src="${l.assetUrl}" alt="${escapeHtml(l.name || 'Accessory')}" onerror="this.onerror=null; this.src='https://app.socialmedium.space/${l.assetUrl.replace(/^buddies\//, 'buddies/')}';" />
+                </div>
+            `).join('');
+
+            const levelTier = getMakerLevelFromXp(xp);
+            const rgb = hexToRgbNormalized(baseColorHex);
+            const filterId = 'kiosk-buddy-tint-' + Math.random().toString(36).substring(2, 9);
+
+            return `
+                <div class="no-print profile-buddy-showcase">
+                    <svg width="0" height="0" style="position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none;" aria-hidden="true">
+                        <filter id="${filterId}" color-interpolation-filters="sRGB">
+                            <feColorMatrix type="matrix" values="
+                                ${rgb.r.toFixed(3)} 0 0 0 0
+                                0 ${rgb.g.toFixed(3)} 0 0 0
+                                0 0 ${rgb.b.toFixed(3)} 0 0
+                                0 0 0 1 0" />
+                        </filter>
+                    </svg>
+                    <div class="text-sm font-semibold text-gray-500 mb-1">Welcome, <span class="text-cyan-700 font-bold">${escapeHtml(givenName)}</span>!</div>
+                    <div class="profile-buddy-stage-wrapper">
+                        <div class="profile-buddy-stage">
+                            <div class="profile-buddy-shadow"></div>
+                            <div class="profile-buddy-layer buddy-base-layer" style="z-index: ${baseItem.zIndex || 30}; isolation: isolate;">
+                                <div class="profile-buddy-color-mask" style="background-color: ${baseColorHex}; -webkit-mask: url('${baseItem.assetUrl}') center/contain no-repeat; mask: url('${baseItem.assetUrl}') center/contain no-repeat;"></div>
+                                <img class="profile-buddy-img profile-buddy-base-img" style="filter: url(#${filterId}); mix-blend-mode: multiply;" src="${baseItem.assetUrl}" alt="Buddy Mascot" onerror="this.onerror=null; this.src='https://app.socialmedium.space/buddies/basic_buddy.png';" />
+                            </div>
+                            ${accessoriesHtml}
+                        </div>
+                    </div>
+                    <div class="profile-buddy-info">
+                        <div class="profile-buddy-level-badge">
+                            <span class="buddy-badge-icon">${levelTier.badgeEmoji}</span>
+                            <span class="buddy-badge-lvl">${escapeHtml(levelTier.title)}</span>
+                        </div>
+                        <div class="profile-buddy-stats-row mt-1">
+                            <span class="buddy-stat-pill xp-pill" title="Experience Points">
+                                <span>⭐</span>
+                                <span>${xp.toLocaleString()} XP</span>
+                            </span>
+                            <span class="buddy-stat-pill bucks-pill" title="Buddy Bucks Balance">
+                                <span>🪙</span>
+                                <span>${buddyBucks.toLocaleString()} Bucks</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function generateBuddyAvatarHTML() {
+            if (!currentAccount) return '';
+            const fields = currentAccount.accountCustomFields || [];
+            const contact = currentAccount.primaryContact || {};
+            const givenName = (contact.preferredName || contact.firstName || 'Maker').trim();
+
+            let buddyAvatar = null;
+            let buddyBucks = 0;
+            let xp = 0;
+
+            for (const f of fields) {
+                const fid = String(f.id);
+                const fname = (f.name || '').toLowerCase();
+                const val = f.value !== undefined && f.value !== null ? String(f.value).trim() : '';
+
+                if (fid === '120' || fname.includes('buddy avatar') || fname === 'avatar') {
+                    if (val && val.startsWith('{')) {
+                        try { buddyAvatar = JSON.parse(val); } catch (_) { buddyAvatar = null; }
+                    }
+                } else if (fid === '121' || fname.includes('buddy bucks') || fname.includes('buddy buck')) {
+                    const num = parseInt(val.replace(/[^0-9]/g, ''), 10);
+                    if (!isNaN(num) && num >= 0 && num < 1000000) buddyBucks = num;
+                } else if (fid === '122' || fname === 'xp' || fname.includes('experience points')) {
+                    const num = parseInt(val.replace(/[^0-9]/g, ''), 10);
+                    if (!isNaN(num) && num >= 0 && num < 1000000) xp = num;
+                }
+            }
+
+            return renderBuddyAvatarHtml(buddyAvatar, xp, buddyBucks, givenName);
+        }
         const SYSTEM_USER_ID = "3508"; 
         const WAIVER_URL = "https://socialmedium.app.neoncrm.com/forms/waiver";
         const EVENTS_URL = "https://socialmedium.app.neoncrm.com/np/constituent/eventList.do?orgId=socialmedium";
@@ -806,6 +1284,8 @@
             preview.innerHTML = confirmTagHTML;
             const printEl = document.getElementById('nametag-to-print');
             if (printEl) printEl.innerHTML = confirmTagHTML;
+            const buddyEl = document.getElementById('buddy-confirm-preview');
+            if (buddyEl) buddyEl.innerHTML = generateBuddyAvatarHTML();
 
             if (!isSigned) {
                 actions.innerHTML = `<div class="bg-red-50 text-red-700 p-6 rounded-xl max-w-md mx-auto"><div id="qrcode-confirm" class="mb-6 flex justify-center bg-white p-4 rounded-lg inline-block mx-auto"></div><br><a href="${WAIVER_URL}" target="_blank" class="font-bold underline text-2xl">Sign Waiver</a></div>`;
@@ -1463,6 +1943,8 @@
                 const finalTagHTML = generateNametagHTML();
                 document.getElementById('nametag-final-preview').innerHTML = finalTagHTML;
                 document.getElementById('nametag-to-print').innerHTML = finalTagHTML;
+                const buddyFinalEl = document.getElementById('buddy-final-preview');
+                if (buddyFinalEl) buddyFinalEl.innerHTML = generateBuddyAvatarHTML();
                 
                 showStage('stage-success');
                 eventsCurrentPage = 1;
