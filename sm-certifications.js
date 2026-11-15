@@ -193,18 +193,19 @@
     var items = dedupeAndGroup(certsList);
     if (items.length === 0) return '';
 
-    var html = '<div class="nametag-certs-row flex items-center gap-3 mt-4 pt-4 border-t-4 border-black flex-wrap">';
+    var html = '<div class="nametag-certs-row flex items-center gap-1.5 flex-wrap">';
 
     items.forEach(function (item) {
       // Pure black SVG for thermal printing (no text, just icon + '+' badge)
       var blackSvg = item.iconSvg
         .replace(/stroke="currentColor"/g, 'stroke="#000000"')
-        .replace(/width="24" height="24"/g, 'width="44" height="44"');
+        .replace(/fill="currentColor"/g, 'fill="#000000"')
+        .replace(/width="24" height="24"/g, 'width="18" height="18"');
 
-      html += '<div class="relative flex items-center justify-center p-2 rounded-2xl border-4 border-black bg-white" title="' + item.name + (item.isAdvanced ? ' (Advanced)' : '') + '">';
-      html += '<div class="w-11 h-11 flex items-center justify-center shrink-0">' + blackSvg + '</div>';
+      html += '<div class="nametag-cert-pill relative inline-flex items-center justify-center px-1.5 py-0.5 rounded border-[1.5px] border-black bg-white" title="' + item.name + (item.isAdvanced ? ' (Advanced)' : '') + '">';
+      html += '<div class="nametag-cert-icon w-[18px] h-[18px] flex items-center justify-center shrink-0">' + blackSvg + '</div>';
       if (item.isAdvanced) {
-        html += '<span class="text-3xl font-black text-black leading-none ml-1">+</span>';
+        html += '<span class="nametag-cert-plus text-xs font-black text-black leading-none ml-0.5">+</span>';
       }
       html += '</div>';
     });

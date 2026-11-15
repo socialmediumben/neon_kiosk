@@ -15,17 +15,313 @@
         .spinner { border: 4px solid rgba(0,0,0,0.1); width: 32px; height: 32px; border-radius: 50%; border-left-color: #0891b2; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        /* Nametag Screen Preview Styles (Proportional 3:2 Aspect Ratio) */
+        .nametag-preview-wrap {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            margin: 0 auto;
+        }
+        .nametag-card {
+            width: 100%;
+            max-width: 440px;
+            aspect-ratio: 3 / 2;
+            background: #ffffff;
+            border: 4px solid #000000;
+            border-radius: 18px;
+            padding: 14px 18px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-sizing: border-box;
+            text-align: left;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        .nametag-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .nametag-name {
+            font-size: 32px;
+            font-weight: 900;
+            line-height: 1.0;
+            text-transform: uppercase;
+            letter-spacing: -0.02em;
+            color: #000000;
+            word-break: break-word;
+        }
+        .nametag-name.long-name { font-size: 24px; }
+        .nametag-name.very-long-name { font-size: 19px; }
+        .nametag-badge {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .nametag-badge-star {
+            font-size: 30px;
+            line-height: 1;
+            color: #000000;
+        }
+        .nametag-badge-circle {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #000000;
+            border-radius: 50%;
+        }
+        .nametag-pronouns {
+            font-size: 13px;
+            font-weight: 700;
+            color: #000000;
+            line-height: 1.1;
+            margin-top: 3px;
+        }
+        .nametag-body {
+            margin-top: auto;
+            margin-bottom: auto;
+            padding-top: 4px;
+        }
+        .nametag-nerdy-label {
+            font-size: 10px;
+            font-weight: 900;
+            font-style: italic;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #000000;
+            line-height: 1.1;
+            margin-bottom: 2px;
+        }
+        .nametag-interests {
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.25;
+            color: #000000;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .nametag-certs-container {
+            border-top: 2px solid #000000;
+            padding-top: 6px;
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+        .nametag-certs-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .nametag-cert-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3px 5px;
+            border: 1.5px solid #000000;
+            border-radius: 6px;
+            background: #ffffff;
+            line-height: 1;
+        }
+        .nametag-cert-icon svg {
+            width: 18px;
+            height: 18px;
+            stroke-width: 2.2;
+        }
+        .nametag-cert-plus {
+            font-size: 12px;
+            font-weight: 900;
+            line-height: 1;
+            margin-left: 2px;
+            color: #000000;
+        }
+
+        /* Thermal Printer 2" Tall x 3" Wide Print Stylesheet */
+        @page {
+            size: 3in 2in;
+            margin: 0;
+        }
         @media print {
-            body * { visibility: hidden; }
-            #nametag-to-print, #nametag-to-print * { visibility: visible !important; }
+            *, *:before, *:after {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                box-sizing: border-box !important;
+            }
+            html, body {
+                width: 3in !important;
+                height: 2in !important;
+                max-width: 3in !important;
+                max-height: 2in !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: hidden !important;
+                background: #ffffff !important;
+            }
+            body * {
+                visibility: hidden !important;
+            }
+            #nametag-to-print, #nametag-to-print * {
+                visibility: visible !important;
+            }
             #nametag-to-print {
                 display: block !important;
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
+                position: fixed !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 3in !important;
+                height: 2in !important;
+                max-width: 3in !important;
+                max-height: 2in !important;
+                margin: 0 !important;
+                padding: 0.05in !important; /* safe 0.05in (~3.6pt / 1.3mm) label margin */
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+                page-break-before: avoid !important;
+                page-break-after: avoid !important;
+                page-break-inside: avoid !important;
             }
-            .no-print { display: none !important; }
+            #nametag-to-print .nametag-preview-wrap {
+                width: 100% !important;
+                height: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                display: block !important;
+            }
+            #nametag-to-print .nametag-card {
+                width: 100% !important;
+                height: 100% !important;
+                max-width: none !important;
+                aspect-ratio: auto !important;
+                margin: 0 !important;
+                padding: 6pt 8pt !important;
+                border: 2.2pt solid #000000 !important;
+                border-radius: 7pt !important;
+                box-sizing: border-box !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+                box-shadow: none !important;
+                overflow: hidden !important;
+            }
+            #nametag-to-print .nametag-header {
+                display: flex !important;
+                justify-content: space-between !important;
+                align-items: flex-start !important;
+                gap: 5pt !important;
+            }
+            #nametag-to-print .nametag-name {
+                font-size: 21pt !important;
+                line-height: 1.0 !important;
+                font-weight: 900 !important;
+                letter-spacing: -0.02em !important;
+                color: #000000 !important;
+            }
+            #nametag-to-print .nametag-name.long-name {
+                font-size: 16pt !important;
+            }
+            #nametag-to-print .nametag-name.very-long-name {
+                font-size: 13pt !important;
+            }
+            #nametag-to-print .nametag-badge {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                flex-shrink: 0 !important;
+            }
+            #nametag-to-print .nametag-badge-star {
+                font-size: 20pt !important;
+                line-height: 1 !important;
+                color: #000000 !important;
+            }
+            #nametag-to-print .nametag-badge-circle {
+                width: 15pt !important;
+                height: 15pt !important;
+                border: 1.8pt solid #000000 !important;
+                border-radius: 50% !important;
+            }
+            #nametag-to-print .nametag-pronouns {
+                font-size: 8pt !important;
+                font-weight: 700 !important;
+                color: #000000 !important;
+                line-height: 1.1 !important;
+                margin-top: 1.5pt !important;
+            }
+            #nametag-to-print .nametag-body {
+                margin-top: auto !important;
+                margin-bottom: auto !important;
+                padding-top: 2pt !important;
+            }
+            #nametag-to-print .nametag-nerdy-label {
+                font-size: 6.8pt !important;
+                font-weight: 900 !important;
+                font-style: italic !important;
+                text-transform: uppercase !important;
+                letter-spacing: 0.04em !important;
+                color: #000000 !important;
+                line-height: 1.1 !important;
+                margin-bottom: 1.5pt !important;
+            }
+            #nametag-to-print .nametag-interests {
+                font-size: 8.2pt !important;
+                font-weight: 700 !important;
+                line-height: 1.15 !important;
+                color: #000000 !important;
+                display: -webkit-box !important;
+                -webkit-line-clamp: 2 !important;
+                -webkit-box-orient: vertical !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+            }
+            #nametag-to-print .nametag-certs-container {
+                border-top: 1.5pt solid #000000 !important;
+                padding-top: 2.5pt !important;
+                margin-top: 2pt !important;
+                flex-shrink: 0 !important;
+            }
+            #nametag-to-print .nametag-certs-row {
+                display: flex !important;
+                align-items: center !important;
+                gap: 3.5pt !important;
+                flex-wrap: wrap !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+            }
+            #nametag-to-print .nametag-cert-pill {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding: 1.5pt 2.5pt !important;
+                border: 1pt solid #000000 !important;
+                border-radius: 3pt !important;
+                background: #ffffff !important;
+                line-height: 1 !important;
+            }
+            #nametag-to-print .nametag-cert-icon {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+            #nametag-to-print .nametag-cert-icon svg {
+                width: 11pt !important;
+                height: 11pt !important;
+                stroke-width: 2.2 !important;
+            }
+            #nametag-to-print .nametag-cert-plus {
+                font-size: 8.5pt !important;
+                font-weight: 900 !important;
+                line-height: 1 !important;
+                margin-left: 1.5pt !important;
+                color: #000000 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
         }
     </style>
 </head>
@@ -112,7 +408,7 @@
             <div class="spinner"></div>
             <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
         </div>
-        <p class="text-xs text-gray-300 mt-6 text-center no-print">v4.9</p>
+        <p class="text-xs text-gray-300 mt-6 text-center no-print">v5.0</p>
     </div>
 
     <div id="nametag-to-print" class="hidden"></div>
@@ -384,11 +680,12 @@
         }
 
         function generateNametagHTML() {
-            const contact = currentAccount.primaryContact;
+            const contact = currentAccount.primaryContact || {};
             const fields = currentAccount.accountCustomFields || [];
             const membership = currentAccount.accountCurrentMembershipStatus || "None";
-            const pronouns = contact.gender ? contact.gender.name : "___________";
-            const name = contact.preferredName || contact.firstName;
+            const pronouns = (contact.gender && contact.gender.name) ? contact.gender.name : "___________";
+            const rawName = (contact.preferredName || contact.firstName || "Friend").trim();
+            const name = rawName.toUpperCase();
 
             const interestField = fields.find(f => f.id === INTERESTS_FIELD_ID);
             const interests = interestField && interestField.optionValues ? interestField.optionValues.map(o => o.name).join(", ") : "";
@@ -399,8 +696,8 @@
 
             const isActive = membership.toLowerCase() === 'active';
             const badgeHTML = isActive 
-                ? '<div class="h-24 w-24 flex items-center justify-center text-8xl leading-none text-black">★</div>'
-                : '<div class="border-4 border-black rounded-full h-24 w-24"></div>';
+                ? '<span class="nametag-badge-star" title="Active Member">★</span>'
+                : '<div class="nametag-badge-circle" title="Guest / Day Pass"></div>';
 
             const certField = fields.find(f => f.id === CERTIFICATIONS_FIELD_ID);
             let certsList = [];
@@ -417,19 +714,29 @@
                 certsHTML = SMCertifications.renderNametagIcons(certsList);
             }
 
+            // Adaptive font sizing for long names on 3" label
+            let nameClass = 'nametag-name';
+            if (name.length > 14) {
+                nameClass += ' very-long-name';
+            } else if (name.length > 10) {
+                nameClass += ' long-name';
+            }
+
             return `
-                <div class="border-[12px] border-black rounded-[40px] p-12 text-left bg-white w-full max-w-3xl aspect-[3/2] flex flex-col justify-between">
-                    <div>
-                        <div class="flex justify-between items-start">
-                            <div class="text-8xl font-black uppercase tracking-tighter text-black">${name}</div>
-                            ${badgeHTML}
+                <div class="nametag-preview-wrap">
+                    <div class="nametag-card">
+                        <div>
+                            <div class="nametag-header">
+                                <div class="${nameClass}">${name}</div>
+                                <div class="nametag-badge">${badgeHTML}</div>
+                            </div>
+                            <div class="nametag-pronouns">Pronouns: ${pronouns}</div>
                         </div>
-                        <div class="text-3xl font-bold mt-4 text-black">Pronouns: ${pronouns}</div>
-                    </div>
-                    <div class="mt-6">
-                        <div class="text-4xl font-black italic uppercase text-gray-300">I'm Nerdy for...</div>
-                        <div class="text-3xl font-bold mt-2 leading-tight text-black">${combinedInterests || "Everything!"}</div>
-                        ${certsHTML}
+                        <div class="nametag-body">
+                            <div class="nametag-nerdy-label">I'M NERDY FOR...</div>
+                            <div class="nametag-interests">${combinedInterests || "Everything!"}</div>
+                        </div>
+                        ${certsHTML ? `<div class="nametag-certs-container">${certsHTML}</div>` : ''}
                     </div>
                 </div>
             `;
@@ -449,7 +756,10 @@
                 return;
             }
 
-            preview.innerHTML = generateNametagHTML();
+            const confirmTagHTML = generateNametagHTML();
+            preview.innerHTML = confirmTagHTML;
+            const printEl = document.getElementById('nametag-to-print');
+            if (printEl) printEl.innerHTML = confirmTagHTML;
 
             if (!isSigned) {
                 actions.innerHTML = `<div class="bg-red-50 text-red-700 p-6 rounded-xl max-w-md mx-auto"><div id="qrcode-confirm" class="mb-6 flex justify-center bg-white p-4 rounded-lg inline-block mx-auto"></div><br><a href="${WAIVER_URL}" target="_blank" class="font-bold underline text-2xl">Sign Waiver</a></div>`;
