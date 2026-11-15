@@ -1,0 +1,25 @@
+{
+  "updatedAt": "2026-11-14T21:50:00.000Z",
+  "brandLogo": null,
+  "moduleVisibility": {
+    "costumeContest": "none",
+    "gameRoom": "all",
+    "store": "all"
+  },
+  "portalDoorSettings": {
+    "contestMode": false,
+    "digitalBackground": true,
+    "sound": true,
+    "photoboothMode": false,
+    "updatedAt": "2026-11-14T21:50:00.000Z",
+    "updatedBy": "system"
+  },
+  "xpRules": null,
+  "levelTiers": null,
+  "toolMappings": null,
+  "storeSettings": {
+    "donationFormUrl": "https://socialmedium.app.neoncrm.com/forms/store-donation-form",
+    "balanceFieldId": "119",
+    "xpFieldId": "120"
+  }
+}
