@@ -151,6 +151,14 @@ const DEFAULT_APP_SETTINGS = {
         gameRoom: 'all',
         store: 'all'
     },
+    portalDoorSettings: {
+        contestMode: false,
+        digitalBackground: true,
+        sound: true,
+        photoboothMode: false,
+        updatedAt: new Date().toISOString(),
+        updatedBy: 'system'
+    },
     xpRules: null,
     levelTiers: null,
     toolMappings: null,
@@ -203,6 +211,10 @@ app.post('/api/app-settings', (req, res) => {
                 ...(current.moduleVisibility || {}),
                 ...(incoming.moduleVisibility || {})
             },
+            portalDoorSettings: {
+                ...(current.portalDoorSettings || DEFAULT_APP_SETTINGS.portalDoorSettings),
+                ...(incoming.portalDoorSettings || {})
+            },
             storeSettings: {
                 ...(current.storeSettings || {}),
                 ...(incoming.storeSettings || {})
@@ -225,6 +237,36 @@ app.post('/api/app-settings', (req, res) => {
         res.json({ success: true, settings: updated });
     } catch (err) {
         console.error('[App Settings] Failed to save app settings:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ============================================================================
+// Portal Door Remote Control Settings API
+// ============================================================================
+app.get('/api/portal-door/settings', (req, res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    const settings = getStoredAppSettings();
+    res.json({ success: true, settings: settings.portalDoorSettings || DEFAULT_APP_SETTINGS.portalDoorSettings });
+});
+
+app.post('/api/portal-door/settings', (req, res) => {
+    try {
+        const current = getStoredAppSettings();
+        const incoming = req.body || {};
+        const updatedPortalSettings = {
+            ...(current.portalDoorSettings || DEFAULT_APP_SETTINGS.portalDoorSettings),
+            ...incoming,
+            updatedAt: new Date().toISOString()
+        };
+        current.portalDoorSettings = updatedPortalSettings;
+        current.updatedAt = updatedPortalSettings.updatedAt;
+
+        saveStoredAppSettings(current);
+        console.log(`[Portal Door Settings] Updated by ${incoming.updatedBy || 'client'}:`, updatedPortalSettings);
+        res.json({ success: true, settings: updatedPortalSettings });
+    } catch (err) {
+        console.error('[Portal Door Settings] Error updating settings:', err);
         res.status(500).json({ success: false, error: err.message });
     }
 });
