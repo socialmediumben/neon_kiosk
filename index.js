@@ -165,8 +165,11 @@ const DEFAULT_APP_SETTINGS = {
     storeSettings: {
         donationFormUrl: 'https://socialmedium.app.neoncrm.com/forms/store-donation-form',
         balanceFieldId: '119',
-        xpFieldId: '120'
-    }
+        xpFieldId: '120',
+        buddyAvatarFieldId: '',
+        buddyBucksFieldId: ''
+    },
+    buddyAssets: []
 };
 
 const getStoredAppSettings = () => {
