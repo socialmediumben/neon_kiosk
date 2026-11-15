@@ -6,9 +6,8 @@
     <title>Social Medium ID Check-In</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <!-- Central Social Medium Certifications & Tool Icons SSOT -->
-    <script src="sm-certifications.js"></script>
-    <script src="https://app.socialmedium.space/shared/sm-certifications.js"></script>
+    <!-- Central Social Medium Certifications & Tool Icons SSOT (Cache-busted v5.1) -->
+    <script src="sm-certifications.js?v=5.1"></script>
     <style>
         .stage { display: none; }
         .active-stage { display: block; }
@@ -107,38 +106,55 @@
             text-overflow: ellipsis;
         }
         .nametag-certs-container {
-            border-top: 2px solid #000000;
-            padding-top: 6px;
-            margin-top: 4px;
-            flex-shrink: 0;
+            border-top: 1.5px solid #000000 !important;
+            padding-top: 4px !important;
+            margin-top: 4px !important;
+            flex-shrink: 0 !important;
         }
         .nametag-certs-row {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            flex-wrap: wrap;
+            display: flex !important;
+            align-items: center !important;
+            gap: 5px !important;
+            flex-wrap: wrap !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
         }
-        .nametag-cert-pill {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 3px 5px;
-            border: 1.5px solid #000000;
-            border-radius: 6px;
-            background: #ffffff;
-            line-height: 1;
+        .nametag-cert-pill, .nametag-certs-row > div {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 2px 5px !important;
+            border: 1.5px solid #000000 !important;
+            border-radius: 6px !important;
+            background: #ffffff !important;
+            line-height: 1 !important;
+            height: 25px !important;
+            max-height: 25px !important;
+            box-sizing: border-box !important;
         }
-        .nametag-cert-icon svg {
-            width: 18px;
-            height: 18px;
-            stroke-width: 2.2;
+        .nametag-cert-icon {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 16px !important;
+            height: 16px !important;
         }
-        .nametag-cert-plus {
-            font-size: 12px;
-            font-weight: 900;
-            line-height: 1;
-            margin-left: 2px;
-            color: #000000;
+        .nametag-certs-row svg, .nametag-cert-icon svg {
+            width: 16px !important;
+            height: 16px !important;
+            max-width: 16px !important;
+            max-height: 16px !important;
+            stroke: #000000 !important;
+            stroke-width: 2.2 !important;
+            display: block !important;
+        }
+        .nametag-cert-plus, .nametag-certs-row span {
+            font-size: 12px !important;
+            font-weight: 900 !important;
+            line-height: 1 !important;
+            margin-left: 2px !important;
+            color: #000000 !important;
         }
 
         /* Thermal Printer 2" Tall x 3" Wide Print Stylesheet */
@@ -278,41 +294,53 @@
                 text-overflow: ellipsis !important;
             }
             #nametag-to-print .nametag-certs-container {
-                border-top: 1.5pt solid #000000 !important;
-                padding-top: 2.5pt !important;
+                border-top: 1.2pt solid #000000 !important;
+                padding-top: 2pt !important;
                 margin-top: 2pt !important;
                 flex-shrink: 0 !important;
             }
             #nametag-to-print .nametag-certs-row {
                 display: flex !important;
                 align-items: center !important;
-                gap: 3.5pt !important;
+                gap: 3pt !important;
                 flex-wrap: wrap !important;
                 margin: 0 !important;
                 padding: 0 !important;
                 border: none !important;
             }
-            #nametag-to-print .nametag-cert-pill {
+            #nametag-to-print .nametag-cert-pill,
+            #nametag-to-print .nametag-certs-row > div {
                 display: inline-flex !important;
                 align-items: center !important;
                 justify-content: center !important;
-                padding: 1.5pt 2.5pt !important;
+                padding: 1pt 3pt !important;
                 border: 1pt solid #000000 !important;
                 border-radius: 3pt !important;
                 background: #ffffff !important;
                 line-height: 1 !important;
+                height: 15pt !important;
+                max-height: 15pt !important;
+                box-sizing: border-box !important;
             }
             #nametag-to-print .nametag-cert-icon {
-                display: flex !important;
+                display: inline-flex !important;
                 align-items: center !important;
                 justify-content: center !important;
+                width: 11pt !important;
+                height: 11pt !important;
             }
+            #nametag-to-print .nametag-certs-row svg,
             #nametag-to-print .nametag-cert-icon svg {
                 width: 11pt !important;
                 height: 11pt !important;
+                max-width: 11pt !important;
+                max-height: 11pt !important;
+                stroke: #000000 !important;
                 stroke-width: 2.2 !important;
+                display: block !important;
             }
-            #nametag-to-print .nametag-cert-plus {
+            #nametag-to-print .nametag-cert-plus,
+            #nametag-to-print .nametag-certs-row span {
                 font-size: 8.5pt !important;
                 font-weight: 900 !important;
                 line-height: 1 !important;
@@ -408,7 +436,7 @@
             <div class="spinner"></div>
             <p class="mt-2 text-gray-500" id="loader-text">Processing...</p>
         </div>
-        <p class="text-xs text-gray-300 mt-6 text-center no-print">v5.0</p>
+        <p class="text-xs text-gray-300 mt-6 text-center no-print">v5.1</p>
     </div>
 
     <div id="nametag-to-print" class="hidden"></div>
@@ -710,8 +738,26 @@
             }
 
             let certsHTML = '';
-            if (typeof SMCertifications !== 'undefined' && typeof SMCertifications.renderNametagIcons === 'function') {
-                certsHTML = SMCertifications.renderNametagIcons(certsList);
+            if (typeof SMCertifications !== 'undefined' && typeof SMCertifications.dedupeAndGroup === 'function') {
+                const items = SMCertifications.dedupeAndGroup(certsList);
+                if (items && items.length > 0) {
+                    certsHTML = '<div class="nametag-certs-row">';
+                    items.forEach(function(item) {
+                        const blackSvg = (item.iconSvg || '')
+                            .replace(/stroke="[^"]*"/g, 'stroke="#000000"')
+                            .replace(/fill="currentColor"/g, 'fill="#000000"')
+                            .replace(/width="[^"]*"/g, 'width="16"')
+                            .replace(/height="[^"]*"/g, 'height="16"');
+
+                        certsHTML += '<div class="nametag-cert-pill" title="' + item.name + (item.isAdvanced ? ' (Advanced)' : '') + '">';
+                        certsHTML += '<div class="nametag-cert-icon">' + blackSvg + '</div>';
+                        if (item.isAdvanced) {
+                            certsHTML += '<span class="nametag-cert-plus">+</span>';
+                        }
+                        certsHTML += '</div>';
+                    });
+                    certsHTML += '</div>';
+                }
             }
 
             // Adaptive font sizing for long names on 3" label
