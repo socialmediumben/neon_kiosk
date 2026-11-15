@@ -139,6 +139,97 @@ app.post('/api/announcement', (req, res) => {
 });
 
 // ============================================================================
+// Global App & Developer Settings API (Synchronized across all makerspace users)
+// ============================================================================
+const APP_SETTINGS_FILE = path.join(__dirname, 'app_settings.json');
+
+const DEFAULT_APP_SETTINGS = {
+    updatedAt: new Date().toISOString(),
+    brandLogo: null,
+    moduleVisibility: {
+        costumeContest: 'none',
+        gameRoom: 'all',
+        store: 'all'
+    },
+    xpRules: null,
+    levelTiers: null,
+    toolMappings: null,
+    storeSettings: {
+        donationFormUrl: 'https://socialmedium.app.neoncrm.com/forms/store-donation-form',
+        balanceFieldId: '119',
+        xpFieldId: '120'
+    }
+};
+
+const getStoredAppSettings = () => {
+    try {
+        if (fs.existsSync(APP_SETTINGS_FILE)) {
+            const raw = fs.readFileSync(APP_SETTINGS_FILE, 'utf8');
+            const parsed = JSON.parse(raw);
+            return { ...DEFAULT_APP_SETTINGS, ...parsed };
+        }
+    } catch (e) {
+        console.error('[App Settings] Error reading app_settings.json:', e);
+    }
+    return { ...DEFAULT_APP_SETTINGS };
+};
+
+const saveStoredAppSettings = (data) => {
+    try {
+        fs.writeFileSync(APP_SETTINGS_FILE, JSON.stringify(data, null, 2), 'utf8');
+        return true;
+    } catch (e) {
+        console.error('[App Settings] Error writing app_settings.json:', e);
+        return false;
+    }
+};
+
+app.get('/api/app-settings', (req, res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    const settings = getStoredAppSettings();
+    res.json({ success: true, settings });
+});
+
+app.post('/api/app-settings', (req, res) => {
+    try {
+        const current = getStoredAppSettings();
+        const incoming = req.body || {};
+        
+        // Merge nested objects properly
+        const updated = {
+            ...current,
+            ...incoming,
+            moduleVisibility: {
+                ...(current.moduleVisibility || {}),
+                ...(incoming.moduleVisibility || {})
+            },
+            storeSettings: {
+                ...(current.storeSettings || {}),
+                ...(incoming.storeSettings || {})
+            },
+            updatedAt: new Date().toISOString()
+        };
+
+        // If moduleVisibility.costumeContest was updated, sync with costume_contest.json
+        if (incoming.moduleVisibility?.costumeContest) {
+            try {
+                const contest = getStoredCostumeContest();
+                contest.visibility = incoming.moduleVisibility.costumeContest;
+                contest.updatedAt = updated.updatedAt;
+                saveStoredCostumeContest(contest);
+            } catch (_) {}
+        }
+
+        saveStoredAppSettings(updated);
+        console.log(`[App Settings] Saved global developer settings. Fields updated: ${Object.keys(incoming).join(', ')}`);
+        res.json({ success: true, settings: updated });
+    } catch (err) {
+        console.error('[App Settings] Failed to save app settings:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ============================================================================
 // Portal Photos API (Stores & retrieves photobooth captures by tap card)
 // ============================================================================
 const PORTAL_PHOTOS_FILE = path.join(__dirname, 'portal_photos.json');
@@ -674,7 +765,7 @@ const COSTUME_CONTEST_FILE = path.join(__dirname, 'costume_contest.json');
 
 const DEFAULT_COSTUME_CONTEST = {
     status: 'submissions', // 'submissions' | 'voting' | 'ended'
-    visibility: 'all', // 'all' (all users) | 'staff' (staff only) | 'none' (hidden from everyone except developer)
+    visibility: 'none', // 'all' (all users) | 'staff' (staff only) | 'none' (hidden from everyone except developer)
     updatedAt: new Date().toISOString(),
     entries: [],
     votes: {} // voterId -> entryId
@@ -823,6 +914,16 @@ app.post('/api/costume-contest/visibility', (req, res) => {
         contest.visibility = visibility;
         contest.updatedAt = new Date().toISOString();
         saveStoredCostumeContest(contest);
+
+        try {
+            const settings = getStoredAppSettings();
+            settings.moduleVisibility = {
+                ...(settings.moduleVisibility || {}),
+                costumeContest: visibility
+            };
+            settings.updatedAt = contest.updatedAt;
+            saveStoredAppSettings(settings);
+        } catch (_) {}
 
         console.log(`[Costume Contest] Visibility changed to: ${visibility}`);
         res.json({ success: true, visibility: contest.visibility });
