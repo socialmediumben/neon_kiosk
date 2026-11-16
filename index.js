@@ -149,7 +149,21 @@ const DEFAULT_APP_SETTINGS = {
     moduleVisibility: {
         costumeContest: 'none',
         gameRoom: 'all',
-        store: 'all'
+        store: 'all',
+        impact: 'all'
+    },
+    impactSettings: {
+        campaignId: '2',
+        campaignName: 'Giving Tuesday 2026',
+        goalAmount: 5000,
+        raisedAmount: 0,
+        donorCount: 0,
+        donationFormUrl: 'https://socialmedium.app.neoncrm.com/donation.jsp?campaign=2&',
+        headline: 'Support Social Medium Makerspace',
+        description: 'Help us expand tool access, support community workshops, and keep creativity thriving for all!',
+        primaryColor: '#f16622',
+        enabled: true,
+        autoSyncNeon: true
     },
     portalDoorSettings: {
         contestMode: false,
@@ -221,6 +235,10 @@ app.post('/api/app-settings', (req, res) => {
             storeSettings: {
                 ...(current.storeSettings || {}),
                 ...(incoming.storeSettings || {})
+            },
+            impactSettings: {
+                ...(current.impactSettings || DEFAULT_APP_SETTINGS.impactSettings),
+                ...(incoming.impactSettings || {})
             },
             updatedAt: new Date().toISOString()
         };
