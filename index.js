@@ -210,9 +210,60 @@ const saveStoredAppSettings = (data) => {
     }
 };
 
-app.get('/api/app-settings', (req, res) => {
+let lastCampaignStatsCache = { campaignId: null, timestamp: 0, stats: null };
+
+async function syncLiveCampaignStats(impactSettings) {
+    if (!impactSettings || !impactSettings.campaignId || impactSettings.autoSyncNeon === false) {
+        return impactSettings;
+    }
+    const campaignId = String(impactSettings.campaignId).trim();
+    const now = Date.now();
+    // Cache for 20 seconds so we don't spam Neon API on rapid requests
+    if (lastCampaignStatsCache.campaignId === campaignId && (now - lastCampaignStatsCache.timestamp < 20000) && lastCampaignStatsCache.stats) {
+        return {
+            ...impactSettings,
+            ...lastCampaignStatsCache.stats
+        };
+    }
+    try {
+        const auth = getNeonAuth();
+        const res = await fetch(`${getNeonApiUrl()}/campaigns/${campaignId}`, {
+            headers: {
+                'Authorization': `Basic ${auth}`,
+                'NEON-API-VERSION': '2.11',
+                'Content-Type': 'application/json'
+            },
+            signal: AbortSignal.timeout(6000)
+        });
+        if (res.ok) {
+            const data = await res.json();
+            const grandTotal = Number(data.statistics?.grandTotal ?? data.statistics?.donationAmount ?? 0);
+            const donationCount = Number(data.statistics?.donationCount ?? 0);
+            const goal = (typeof data.goal === 'number' && data.goal > 0) ? data.goal : (impactSettings.goalAmount || 5000);
+            const stats = {
+                raisedAmount: grandTotal,
+                donorCount: donationCount,
+                goalAmount: goal
+            };
+            lastCampaignStatsCache = { campaignId, timestamp: now, stats };
+            console.log(`[Neon Kiosk] Synced live stats for campaign ${campaignId}: $${grandTotal} raised (${donationCount} donors)`);
+            return {
+                ...impactSettings,
+                ...stats
+            };
+        }
+    } catch (err) {
+        console.warn(`[Neon Kiosk] Error fetching live stats for campaign ${campaignId}:`, err.message);
+    }
+    return impactSettings;
+}
+
+app.get('/api/app-settings', async (req, res) => {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     const settings = getStoredAppSettings();
+    if (settings.impactSettings && settings.impactSettings.campaignId && settings.impactSettings.autoSyncNeon !== false) {
+        settings.impactSettings = await syncLiveCampaignStats(settings.impactSettings);
+    }
     res.json({ success: true, settings });
 });
 

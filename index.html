@@ -805,9 +805,12 @@
             if (searchBanner) searchBanner.classList.remove('hidden');
             if (welcomeBanner) welcomeBanner.classList.remove('hidden');
 
-            const raised = Number(settings.currentAmount || 0);
+            const raised = Number(settings.raisedAmount !== undefined ? settings.raisedAmount : (settings.currentAmount || 0));
             const goal = Number(settings.goalAmount || 5000) || 5000;
             const pct = Math.min(100, Math.round((raised / goal) * 100));
+            const formattedRaised = (raised % 1 !== 0)
+                ? `$${raised.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                : `$${raised.toLocaleString()}`;
 
             const headline = settings.headline || 'Support Social Medium Makerspace';
             const desc = settings.description || 'Help us expand tool access and keep creativity thriving for all!';
@@ -819,7 +822,7 @@
             const bGoal = document.getElementById('kiosk-impact-goal');
             const bBar = document.getElementById('kiosk-impact-bar');
             if (bHeadline) bHeadline.textContent = headline;
-            if (bRaised) bRaised.textContent = `$${raised.toLocaleString()} raised (${pct}%)`;
+            if (bRaised) bRaised.textContent = `${formattedRaised} raised (${pct}%)`;
             if (bGoal) bGoal.textContent = `Goal: $${goal.toLocaleString()}`;
             if (bBar) bBar.style.width = `${pct}%`;
 
@@ -840,7 +843,7 @@
 
             if (mHeadline) mHeadline.textContent = headline;
             if (mDesc) mDesc.textContent = desc;
-            if (mRaised) mRaised.textContent = `$${raised.toLocaleString()}`;
+            if (mRaised) mRaised.textContent = formattedRaised;
             if (mGoal) mGoal.textContent = `$${goal.toLocaleString()}`;
             if (mProgress) mProgress.style.width = `${pct}%`;
             if (mPct) mPct.textContent = `${pct}% of Goal Reached`;
