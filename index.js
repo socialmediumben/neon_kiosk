@@ -170,6 +170,7 @@ const DEFAULT_APP_SETTINGS = {
         digitalBackground: true,
         sound: true,
         photoboothMode: false,
+        impactMode: false,
         updatedAt: new Date().toISOString(),
         updatedBy: 'system'
     },
