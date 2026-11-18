@@ -2022,7 +2022,7 @@ const SANDBOX_MEMBER_RECORD = {
         accountId: "sandbox-demo",
         accountCurrentMembershipStatus: "Active",
         membershipStatus: "Active",
-        membershipName: "Community Pro Maker",
+        membershipName: "Pro Maker (Full Member)",
         primaryContact: {
             firstName: "Jordan",
             lastName: "Taylor",
@@ -2032,6 +2032,9 @@ const SANDBOX_MEMBER_RECORD = {
             gender: { code: "NB", description: "They/Them" }
         },
         accountCustomFields: [
+            { id: "87", name: "Waiver", value: "Signed" },
+            { id: "81", name: "Interests", value: ["3D Printing", "Laser Cutting", "Woodworking", "Electronics"] },
+            { id: "83", name: "Custom Interests", value: "Rapid prototyping, cosplay, robotics" },
             { id: "114", name: "Tap Card", value: "DEMO-2026" },
             { id: "116", name: "Certifications", value: ["Laser Cutter (CO2 80W)", "3D Printing (FDM / Bambu Lab)", "Woodshop Safety & Table Saw", "Electronics & Soldering Bench", "Vinyl Cutter & Heat Press"] },
             { id: "117", name: "Portal Media", value: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&q=80" },
