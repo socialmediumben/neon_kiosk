@@ -1268,6 +1268,12 @@
         }
 
         async function performUnifiedSearch(input) {
+            const cleanLower = String(input).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (['demo', 'sandbox', 'test', 'demo2026', '5552345678', 'sandboxdemo'].includes(cleanLower)) {
+                await fetchAccountById('sandbox-demo');
+                return;
+            }
+
             // 1. Try searching by Tap Card custom field (ID 114)
             let accounts = await searchByTapCard(input);
             if (accounts.length > 0) {
