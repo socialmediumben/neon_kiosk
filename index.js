@@ -258,6 +258,46 @@ async function syncLiveCampaignStats(impactSettings) {
     return impactSettings;
 }
 
+// Helper to extract high-resolution photos from a public Google Photos shared album
+async function parseGooglePhotosAlbum(albumUrl) {
+    if (!albumUrl || !albumUrl.startsWith('http')) return [];
+    try {
+        const fetchFn = typeof fetch !== 'undefined' ? fetch : require('node-fetch');
+        const res = await fetchFn(albumUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            redirect: 'follow'
+        });
+        const html = await res.text();
+        const matches = html.match(/https:\/\/lh3\.googleusercontent\.com\/pw\/[a-zA-Z0-9_\-]+/g) || [];
+        const seen = new Set();
+        const photos = [];
+        for (const m of matches) {
+            if (!seen.has(m) && m.length > 40) {
+                seen.add(m);
+                photos.append ? photos.append(m + '=w1920-h1080') : photos.push(m + '=w1920-h1080');
+            }
+        }
+        return photos;
+    } catch (err) {
+        console.warn('[Google Photos Parser] Failed to parse album:', err.message);
+        return [];
+    }
+}
+
+app.get('/api/parse-google-photos', async (req, res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    const albumUrl = req.query.url;
+    if (!albumUrl) return res.status(400).json({ success: false, error: 'Missing ?url= parameter' });
+    try {
+        const photos = await parseGooglePhotosAlbum(albumUrl);
+        res.json({ success: true, count: photos.length, photoUrls: photos });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 app.get('/api/app-settings', async (req, res) => {
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     const settings = getStoredAppSettings();
@@ -267,7 +307,7 @@ app.get('/api/app-settings', async (req, res) => {
     res.json({ success: true, settings });
 });
 
-app.post('/api/app-settings', (req, res) => {
+app.post('/api/app-settings', async (req, res) => {
     try {
         const current = getStoredAppSettings();
         const incoming = req.body || {};
@@ -292,6 +332,10 @@ app.post('/api/app-settings', (req, res) => {
                 ...(current.impactSettings || DEFAULT_APP_SETTINGS.impactSettings),
                 ...(incoming.impactSettings || {})
             },
+            kioskDisplaySettings: {
+                ...(current.kioskDisplaySettings || {}),
+                ...(incoming.kioskDisplaySettings || {})
+            },
             updatedAt: new Date().toISOString()
         };
 
@@ -303,6 +347,21 @@ app.post('/api/app-settings', (req, res) => {
                 contest.updatedAt = updated.updatedAt;
                 saveStoredCostumeContest(contest);
             } catch (_) {}
+        }
+
+        // Auto-extract Google Photos if album URL was provided and photoUrls is empty or updated
+        const incomingAlbumUrl = incoming.kioskDisplaySettings?.googlePhotosAlbumUrl;
+        const currentAlbumUrl = current.kioskDisplaySettings?.googlePhotosAlbumUrl;
+        if (incomingAlbumUrl && (incomingAlbumUrl !== currentAlbumUrl || !updated.kioskDisplaySettings.photoUrls || updated.kioskDisplaySettings.photoUrls.length === 0)) {
+            try {
+                const extractedPhotos = await parseGooglePhotosAlbum(incomingAlbumUrl);
+                if (extractedPhotos && extractedPhotos.length > 0) {
+                    updated.kioskDisplaySettings.photoUrls = extractedPhotos;
+                    console.log(`[Google Photos Parser] Automatically extracted ${extractedPhotos.length} photos for kiosk display!`);
+                }
+            } catch (pErr) {
+                console.warn('[Google Photos Parser] Auto-extraction notice:', pErr.message);
+            }
         }
 
         saveStoredAppSettings(updated);
