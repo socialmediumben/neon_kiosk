@@ -555,8 +555,8 @@
         <div id="stage-waiver" class="stage">
             <h1 class="text-3xl font-bold text-gray-800 mb-4">Sign Waiver</h1>
             <div id="qrcode-direct" class="mb-6 flex justify-center bg-white p-4 rounded-lg inline-block mx-auto border border-gray-100"></div>
-            <div class="mb-8 text-xl">
-                <a href="https://socialmedium.app.neoncrm.com/forms/waiver" target="_blank" class="text-cyan-600 font-bold underline">socialmedium.app.neoncrm.com/forms/waiver</a>
+            <div class="mb-8 text-lg font-medium text-gray-600">
+                Scan this QR code with your phone camera to sign the waiver on your own device.
             </div>
             <button onclick="showStage('stage-search')" class="w-full max-w-md py-4 bg-gray-200 text-gray-700 rounded-2xl text-xl font-bold mx-auto block">Back</button>
         </div>
@@ -1522,7 +1522,7 @@
             if (buddyEl) buddyEl.innerHTML = generateBuddyAvatarHTML();
 
             if (!isSigned) {
-                actions.innerHTML = `<div class="bg-red-50 text-red-700 p-6 rounded-xl max-w-md mx-auto"><div id="qrcode-confirm" class="mb-6 flex justify-center bg-white p-4 rounded-lg inline-block mx-auto"></div><br><a href="${WAIVER_URL}" target="_blank" class="font-bold underline text-2xl">Sign Waiver</a></div>`;
+                actions.innerHTML = `<div class="bg-red-50 text-red-700 p-6 rounded-xl max-w-md mx-auto"><h3 class="text-xl font-bold mb-3">Waiver Required</h3><div id="qrcode-confirm" class="mb-4 flex justify-center bg-white p-4 rounded-lg inline-block mx-auto"></div><p class="text-sm font-semibold text-gray-700">Scan this QR code with your phone camera to sign the waiver on your own device.</p></div>`;
                 setTimeout(() => {
                     new QRCode(document.getElementById("qrcode-confirm"), { text: WAIVER_URL, width: 200, height: 200 });
                 }, 50);
